@@ -1,9 +1,9 @@
 {
-  "id": "discord-url-20261018-004",
+  "id": "discord-login-check-20261018-005",
   "action": "get_url",
   "ok": true,
   "data": {
-    "current_url": "https://discord.com/login?redirect_to=%2Fchannels%2F1515877468299595919"
+    "current_url": "https://discord.com/channels/1515877468299595919"
   },
-  "finished_at_utc": "2026-10-18T21:37:48.991872+00:00"
+  "finished_at_utc": "2026-10-18T21:42:23.399558+00:00"
 }
