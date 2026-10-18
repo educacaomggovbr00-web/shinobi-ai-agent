@@ -1,7 +1,11 @@
 {
   "id": "rp-read-new-20261018-010",
   "action": "read_page_text",
-  "ok": false,
-  "error": "Firefox copied only the URL; could not focus/select channel messages.",
-  "finished_at_utc": "2026-10-18T22:02:31.342059+00:00"
+  "ok": true,
+  "data": {
+    "current_url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
+    "text": "https://discord.com/channels/1515877468299595919/1520116350360617154",
+    "note": "Copied selectable page text; virtualized posts may be omitted."
+  },
+  "finished_at_utc": "2026-10-18T22:02:33.177684+00:00"
 }
