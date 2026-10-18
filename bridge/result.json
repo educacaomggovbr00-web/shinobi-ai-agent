@@ -1,11 +1,12 @@
 {
-  "id": "read-rp-calls-20261018-007",
-  "action": "read_page_text",
+  "id": "rp-check-20261018-009",
+  "action": "status",
   "ok": true,
   "data": {
-    "current_url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
-    "text": "https://discord.com/channels/1515877468299595919/1520116350360617154",
-    "note": "Copied selectable page text; virtualized posts may be omitted."
+    "connected": true,
+    "display": ":1",
+    "firefox_window": true,
+    "window_title": "(532) Discord | #│・📢〃﹕𝐂hamar-𝐑p | ʚ🍥ɞ 𝐍aruto 𝐏roject ᴿᴾ ⁺ ✦ ˙ — Mozilla Firefox"
   },
-  "finished_at_utc": "2026-10-18T21:43:10.919121+00:00"
+  "finished_at_utc": "2026-10-18T22:01:46.566679+00:00"
 }
