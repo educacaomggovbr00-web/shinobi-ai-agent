@@ -1,5 +1,4 @@
 {
-  "id": "navigate-rp-calls-20261018-006",
-  "action": "open_url",
-  "url": "https://discord.com/channels/1515877468299595919/1520116350360617154"
+  "id": "read-rp-calls-20261018-007",
+  "action": "read_page_text"
 }
