@@ -18,5 +18,5 @@
   "runArgs": [
     "--shm-size=1g"
   ],
-  "postStartCommand": "bash -lc 'sleep 6; if ! pgrep -x firefox-esr >/dev/null; then nohup firefox-esr --new-window https://discord.com/channels/1515877468299595919 >/tmp/shinobi-firefox.log 2>&1 & fi'"
+  "postStartCommand": "bash -lc 'sleep 6; if ! pgrep -x firefox-esr >/dev/null; then nohup firefox-esr --new-window https://discord.com/channels/1515877468299595919 >/tmp/shinobi-firefox.log 2>&1 & fi; nohup bash bridge/start.sh >/tmp/shinobi-bridge.log 2>&1 </dev/null &'"
 }
