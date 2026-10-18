@@ -1,0 +1,22 @@
+{
+  "name": "Shinobi Cloud Browser (Firefox + noVNC)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/desktop-lite:1": {}
+  },
+  "forwardPorts": [
+    6080
+  ],
+  "portsAttributes": {
+    "6080": {
+      "label": "🖥️ Shinobi — navegador gráfico",
+      "onAutoForward": "notify"
+    }
+  },
+  "runArgs": [
+    "--shm-size=1g"
+  ],
+  "postStartCommand": "bash -lc 'sleep 6; if ! pgrep -x firefox-esr >/dev/null; then nohup firefox-esr --new-window https://discord.com/login >/tmp/shinobi-firefox.log 2>&1 & fi'"
+}
