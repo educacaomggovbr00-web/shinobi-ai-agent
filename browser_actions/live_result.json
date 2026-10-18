@@ -1,7 +1,12 @@
 {
-  "id": "idle",
-  "session_id": "none",
+  "id": "bushin-39178166963-start-001",
+  "session_id": "39178166963",
   "action": "status",
-  "ok": false,
-  "note": "No live command has been executed. Start a new Bushin Discord Linux workflow after installing controller."
+  "ok": true,
+  "data": {
+    "online": true,
+    "url": "https://discord.com/login",
+    "title": "Discord"
+  },
+  "finished_at_utc": "2026-10-18T23:51:24.270303+00:00"
 }
