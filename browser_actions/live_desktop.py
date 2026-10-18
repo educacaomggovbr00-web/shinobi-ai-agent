@@ -120,10 +120,10 @@ async def start():
             "websockify", "--web", VNC_DIR, "127.0.0.1:6081", "127.0.0.1:5900"))
 
         # Chromium binary installed by the Playwright setup step.
-        from playwright.sync_api import sync_playwright
-        pw = sync_playwright().start()
+        from playwright.async_api import async_playwright
+        pw = await async_playwright().start()
         chromium_bin = pw.chromium.executable_path
-        pw.stop()
+        await pw.stop()
         processes.append(process(
             chromium_bin, "--no-sandbox", "--disable-dev-shm-usage",
             "--no-first-run", "--disable-default-apps", "--disable-features=MediaRouter",
