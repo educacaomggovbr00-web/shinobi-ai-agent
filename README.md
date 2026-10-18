@@ -1,43 +1,45 @@
-# 🍥 Shinobi Cloud Browser — Naruto Project RP
+# 🍥 Shinobi Cloud Browser — Github Codespaces + Firefox + ChatGPT
 
-Este repositório prepara **um computador Linux na nuvem com Firefox e área de trabalho gráfica**, acessível pelo navegador do celular Android. A configuração usa [GitHub Codespaces](https://docs.github.com/en/codespaces), [desktop-lite](https://github.com/devcontainers/features/tree/main/src/desktop-lite) e **noVNC**.
+Um **navegador gráfico na nuvem**, acessível no celular, com uma **ponte experimental por GitHub** para permitir que este ChatGPT envie comandos específicos ao Firefox do Codespace. **Não é um agente autônomo 24/7 e não depende do Work.**
 
-**Não é um agente de IA nem um self-bot.** Abrir o GitHub não autentica automaticamente no Discord: você precisa entrar no Discord **manualmente**, na janela do Firefox remoto. O navegador abre na página do servidor Naruto Project RP quando o Codespace inicia.
+## ✅ O que já está configurado
 
-## 📱 Abrir pelo Android
+- Linux + Firefox + desktop gráfico [noVNC na porta 6080](https://github.com/devcontainers/features/tree/main/src/desktop-lite)
+- Firefox com página do Naruto Project RP
+- `bridge/bridge.py` — monitor de comandos no repositório privado
+- `bridge/command.json` — fila de **um comando por vez**
+- `bridge/result.json` — aparece depois que o programa processar o primeiro comando
+- Sem tokens ou cookies do Discord gravados no GitHub
 
-1. Abra [Criar/retomar Codespace deste repositório](https://codespaces.new/educacaomggovbr00-web/shinobi-ai-agent?quickstart=1) no Chrome do Android e entre na sua conta GitHub.
-2. Escolha a branch **main** e, se disponível, a menor máquina (**2 cores**). Confirme **Create codespace**. A primeira preparação pode levar alguns minutos.
-3. Espere carregar o editor do Codespaces. Abra a aba **PORTS / PORTAS** (no painel inferior; no celular pode ser necessário usar a versão para computador).
-4. Abra a porta **6080**, identificada como **Shinobi — navegador gráfico**. Mantenha a visibilidade **Private / Privada**. Caso não apareça, use a opção de adicionar/encaminhar a porta 6080.
-5. A página do **noVNC** aparecerá. Toque em **Connect / Conectar** e insira a senha inicial do desktop: **`vscode`** (padrão do desktop-lite, diferente da senha do Discord).
-6. Na área de trabalho Linux, o Firefox deverá abrir o [Naruto Project RP](https://discord.com/channels/1515877468299595919). Faça o login no Discord normalmente **dentro do Firefox remoto**, não no repositório.
-7. Se o Firefox não abrir automaticamente, use o terminal do Codespaces:
-   ```bash
-   firefox-esr https://discord.com/channels/1515877468299595919
-   ```
+## 🚀 Ativar a conexão com o ChatGPT (pelo Android)
 
-### O que a configuração já faz
+1. Abra seu Codespace em [github.com/codespaces](https://github.com/codespaces). **Abra o EDITOR do Codespaces**, não a página do noVNC (porta 6080).
+2. No editor VS Code web, vá em **Terminal → New Terminal**.
+3. Cole este único comando:
 
-- Instala Debian + Firefox ESR sem depender de Snap.
-- Cria a área de trabalho Fluxbox com VNC no navegador, por meio do recurso oficial `desktop-lite`.
-- Encaminha a porta **6080** para exibir a área de trabalho no Android.
-- Tenta abrir o canal do Discord no Firefox quando o Codespace inicia.
-- **Não** usa tokens, senhas, cookies de Discord no GitHub e **não** envia mensagens automaticamente.
+```bash
+cd /workspaces/shinobi-ai-agent && git pull && bash bridge/start.sh
+```
 
-### Segurança e limites
+4. Aguarde aparecer **Shinobi bridge ready** e depois **Saved result for setup-check...**. Mantenha o terminal aberto. Se o terminal informar `gh auth login`, siga as instruções de autenticação do GitHub CLI na interface segura.
+5. Volte ao ChatGPT e diga **"Ponte ligada, confere o resultado"**. O ChatGPT consegue ler o arquivo `bridge/result.json` pela integração do GitHub e enviar um novo comando ao `bridge/command.json`.
+6. Se quiser ver a área de trabalho do Codespace, volte à porta **6080**, noVNC. O navegador deverá permanecer visível nela.
 
-- **Nunca torne pública a porta 6080.** A porta encaminhada deve ficar em **Private**, que é o padrão no GitHub Codespaces. A senha inicial do noVNC é pública/documentada; altere-a no ambiente se for usar por mais tempo.
-- Faça o login você mesmo. Nunca inclua token de usuário, código 2FA, cookies ou senha do Discord em arquivos do repositório, issues ou Actions.
-- A sessão do navegador pode persistir enquanto o **mesmo Codespace** existir, mas pode exigir login novamente após reconstrução/reset.
-- Codespaces **não fica ligado 24 horas sem limite**: pode pausar por inatividade e consome cotas de computação/armazenamento. Verifique seu limite antes de iniciar e não habilite cobrança por engano.
-- **Esta configuração foi escrita no repositório, mas ainda precisa ser testada iniciando um Codespace.** Nenhum login do Discord foi executado.
-- Para controlar este Firefox **a partir do ChatGPT normal**, ainda seria necessária uma integração própria; GitHub por si só não oferece controle remoto ao assistente desta conversa.
+**Importante:** o Codespace não fica ativo 24/7. O GitHub pode pausá-lo, e o monitor só executa comandos enquanto estiver ligado. O ChatGPT não tem acesso a uma transmissão interativa contínua da tela: cada comando passa pelo repositório, é executado pelo monitor e devolve um resultado. Isso é uma alternativa experimental, **não a interface nativa do Work**.
 
-### Links
+## 🔐 Operação e privacidade
 
-- [Abrir/criar Codespace](https://codespaces.new/educacaomggovbr00-web/shinobi-ai-agent?quickstart=1)
-- [Gerenciar Codespaces](https://github.com/codespaces)
+- A porta noVNC 6080 deve permanecer **Private**.
+- Não compartilhe senha do Discord, tokens de sessão ou cookies. Faça login somente dentro do Firefox remoto.
+- Somente estas ações estão disponíveis: `status`, `open_url`, `get_url`, `read_page_text` (apenas canais do Naruto Project RP), `scroll`, `click` e `screenshot` (somente quando solicitado; salva imagem no repositório privado).
+- O monitor não contém comandos de digitar mensagens ou publicá-las no Discord. Automatizar uma conta pessoal do Discord pode contrariar as regras da plataforma.
+- **Nunca coloque a porta 6080 em Public.** Screenshots e texto copiado da página só devem ser requisitados quando necessário, pois podem conter informações sensíveis e serão salvos no repositório privado.
+- Se `bridge/result.json` não aparecer, confira o terminal do Codespaces. Esse arquivo **não é prova de execução até que seja escrito pelo processo em execução**.
+- O comando inicial na fila é uma checagem de status inofensiva: ele verifica se a sessão Firefox está aberta. Não envia mensagem.
+
+## Links
+
+- [Editor dos Codespaces](https://github.com/codespaces)
+- [Desktop remoto porta 6080](https://silver-waddle-g496jj9vpvgjhpp7j-6080.app.github.dev/)
 - [Servidor Naruto Project RP](https://discord.com/channels/1515877468299595919)
-- [Documentação do desktop-lite](https://github.com/devcontainers/features/blob/main/src/desktop-lite/README.md)
-- [Portas do Codespaces](https://docs.github.com/en/codespaces/developing-in-a-codespace/forwarding-ports-in-your-codespace)
+- [Pasta da ponte](https://github.com/educacaomggovbr00-web/shinobi-ai-agent/tree/main/bridge)
