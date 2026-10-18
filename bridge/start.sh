@@ -33,5 +33,17 @@ fi
 
 export DISPLAY="${DISPLAY:-:1}"
 echo "GitHub authentication found. Display: $DISPLAY"
+if ! xdotool search --onlyvisible --class firefox >/dev/null 2>&1; then
+  echo "Launching Firefox on remote desktop..."
+  nohup firefox-esr --new-window https://discord.com/channels/1515877468299595919 \
+    >/tmp/shinobi-firefox.log 2>&1 </dev/null &
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if xdotool search --onlyvisible --class firefox >/dev/null 2>&1; then
+      echo "Firefox window detected."
+      break
+    fi
+    sleep 2
+  done
+fi
 echo "Starting browser command bridge. Leave this terminal open."
 exec python3 -u bridge/bridge.py
