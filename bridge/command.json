@@ -1,4 +1,4 @@
 {
-  "id": "rp-check-20261018-009",
-  "action": "status"
+  "id": "rp-read-new-20261018-010",
+  "action": "read_page_text"
 }
