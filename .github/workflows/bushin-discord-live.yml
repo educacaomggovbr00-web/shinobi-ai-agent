@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: bushin-discord-interactive-desktop
+  group: bushin-discord-interactive-desktop-v12
   cancel-in-progress: false
 
 jobs:
