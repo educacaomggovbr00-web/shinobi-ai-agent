@@ -1,0 +1,131 @@
+name: "🍥 Shinobi — AO VIVO"
+on:
+  workflow_dispatch:
+    inputs:
+      minutos:
+        description: "Quanto tempo acompanhar o Firefox?"
+        required: true
+        type: choice
+        default: "5"
+        options:
+          - "3"
+          - "5"
+          - "10"
+
+permissions:
+  contents: write
+
+# Avoid two Actions workflows simultaneously replacing bridge/command.json.
+concurrency:
+  group: shinobi-browser-control
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: "Monitorando Firefox no Codespace"
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - name: "📡 Conexão ao vivo (logs atualizados)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MINUTES: ${{ inputs.minutos }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MINUTES" in 3|5|10) ;; *) echo "Duração inválida."; exit 1 ;; esac
+
+          start="$(date +%s)"
+          until_time="$((start + MINUTES * 60))"
+          iteration=0
+          good=0
+          echo "🍥 Iniciando Shinobi AO VIVO — $MINUTES minutos."
+          echo "💡 Acompanhe esta execução na aba de LOGS. O vídeo ao vivo está no noVNC do Codespace."
+          echo ""
+          {
+            echo "## 🍥 Shinobi AO VIVO"
+            echo ""
+            echo "Monitorando a conexão Firefox ↔ Codespace por $MINUTES minutos."
+            echo "Este workflow não lê conversas nem envia mensagens ao Discord."
+            echo ""
+            echo "### Tela gráfica (ao vivo)"
+            echo "[Abrir Firefox no Codespace](https://silver-waddle-g496jj9vpvgjhpp7j-6080.app.github.dev/)"
+            echo ""
+            echo "### Acompanhamento"
+            echo "As atualizações aparecem nos logs desta execução."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          while [ "$(date +%s)" -lt "$until_time" ]; do
+            iteration="$((iteration + 1))"
+            command_id="shinobi-live-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$iteration"
+            payload="$(jq -nc --arg id "$command_id" '{id:$id,action:"status"}')"
+            encoded="$(printf '%s' "$payload" | base64 -w0)"
+
+            # Actions only coordinates the running Codespace; it does NOT host Firefox.
+            sent=false
+            for update_try in 1 2 3; do
+              sha="$(gh api "repos/$REPO/contents/bridge/command.json" --jq .sha)"
+              request="$(jq -nc --arg content "$encoded" --arg sha "$sha" --arg message "Live monitor status $command_id" \
+                '{message:$message,content:$content,sha:$sha,branch:"main"}')"
+              if gh api --method PUT "repos/$REPO/contents/bridge/command.json" --input - \
+                >/dev/null 2>&1 <<< "$request"; then
+                sent=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$sent" != true ]; then
+              echo "❌ Não consegui enfileirar o comando no repositório."
+              exit 1
+            fi
+
+            found=false
+            for wait_try in $(seq 1 14); do
+              sleep 3
+              b64="$(gh api "repos/$REPO/contents/bridge/result.json" --jq .content 2>/dev/null || true)"
+              if [ -z "$b64" ]; then continue; fi
+              response="$(printf '%s' "$b64" | base64 -d 2>/dev/null || true)"
+              if [ -z "$response" ]; then continue; fi
+              response_id="$(jq -r '.id // empty' <<< "$response" 2>/dev/null || true)"
+              if [ "$response_id" = "$command_id" ]; then
+                found=true
+                break
+              fi
+            done
+
+            at="$(date -u +'%H:%M:%S UTC')"
+            if [ "$found" != true ]; then
+              echo "[$at] ❌ Sem resposta do Codespace. Verifique se bash bridge/start.sh está rodando."
+              exit 1
+            fi
+
+            ok="$(jq -r '.ok // false' <<< "$response")"
+            if [ "$ok" != "true" ]; then
+              echo "[$at] ❌ A ponte respondeu com erro; verifique o terminal do Codespace."
+              exit 1
+            fi
+            browser="$(jq -r '.data.firefox_window // false' <<< "$response")"
+            discord="$(jq -r '(.data.window_title // "") | ascii_downcase | contains("discord")' <<< "$response")"
+            if [ "$browser" = "true" ]; then
+              good="$((good + 1))"
+              if [ "$discord" = "true" ]; then
+                echo "[$at] 🟢 Firefox online · Discord na janela · teste #$iteration"
+              else
+                echo "[$at] 🟡 Firefox online · outra página/janela · teste #$iteration"
+              fi
+            else
+              echo "[$at] 🔴 Ponte online, mas janela do Firefox ausente · teste #$iteration"
+            fi
+
+            # Updates approximately every 30 seconds; no browser cookies or chat text in logs.
+            sleep 16
+          done
+
+          echo ""
+          echo "✅ Monitoramento finalizado. $good/$iteration testes detectaram Firefox."
+          {
+            echo "### Resultado"
+            echo "Concluído: **$good/$iteration** testes detectaram Firefox."
+          } >> "$GITHUB_STEP_SUMMARY"
