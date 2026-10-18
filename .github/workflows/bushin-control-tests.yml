@@ -1,0 +1,26 @@
+name: "🍥 Bushin — Testes de integração"
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Verificar scripts"
+        run: |
+          python -m py_compile browser_actions/live_desktop.py browser_actions/live_controller.py
+      - name: "Testar comandos e isolamento de sessões"
+        run: |
+          python -m unittest discover -s browser_actions -p test_live_controller.py -v
+      - name: "Confirmar isolamento do desktop Linux"
+        run: |
+          grep -q -- '--remote-debugging-address=127.0.0.1' browser_actions/live_desktop.py
+          grep -q -- 'GH_TOKEN' browser_actions/live_desktop.py
