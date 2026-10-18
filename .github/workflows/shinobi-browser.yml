@@ -1,0 +1,90 @@
+name: 🍥 Shinobi — Browser no Codespace
+on:
+  workflow_dispatch:
+    inputs:
+      comando:
+        description: "Escolha o que pedir ao navegador no Codespace"
+        required: true
+        type: choice
+        default: "status"
+        options:
+          - status
+          - abrir-chamar-rp
+          - ler-canal
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shinobi-browser-control
+  cancel-in-progress: false
+
+jobs:
+  navegador:
+    name: Conectar ao navegador e aguardar resposta
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enviar comando ao Shinobi Cloud Browser
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMANDO: ${{ inputs.comando }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$COMANDO" in
+            status)
+              action="status"
+              url=""
+              ;;
+            abrir-chamar-rp)
+              action="open_url"
+              url="https://discord.com/channels/1515877468299595919/1520116350360617154"
+              ;;
+            ler-canal)
+              action="read_page_text"
+              url=""
+              ;;
+            *)
+              echo "Comando desconhecido."
+              exit 1
+              ;;
+          esac
+          task_id="actions-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          payload="$(jq -nc --arg id "$task_id" --arg action "$action" --arg url "$url" 'if $url == "" then {id:$id, action:$action} else {id:$id, action:$action, url:$url} end')"
+          encoded="$(printf '%s' "$payload" | base64 -w0)"
+          sha="$(gh api "repos/$REPO/contents/bridge/command.json" --jq .sha)"
+          jq -nc --arg message "Dispatch browser action $task_id" --arg content "$encoded" --arg sha "$sha" \
+            '{message:$message, content:$content, sha:$sha, branch:"main"}' |
+            gh api --method PUT "repos/$REPO/contents/bridge/command.json" --input - >/dev/null
+
+          echo "Comando enviado: $action"
+          for attempt in $(seq 1 30); do
+            sleep 4
+            response="$(gh api "repos/$REPO/contents/bridge/result.json" --jq .content | base64 -d)" || continue
+            got_id="$(jq -r '.id // ""' <<< "$response")"
+            if [[ "$got_id" == "$task_id" ]]; then
+              echo "$response" | jq .
+              {
+                echo "### 🍥 Resultado do Shinobi Browser"
+                echo ""
+                echo "- Comando: \`$COMANDO\`"
+                echo "- Solicitação: \`$task_id\`"
+                echo ""
+                echo '~~~json'
+                printf '%s\n' "$response" | head -c 9000
+                echo ""
+                echo '~~~'
+              } >> "$GITHUB_STEP_SUMMARY"
+              if [[ "$(jq -r .ok <<< "$response")" != "true" ]]; then
+                echo "O navegador respondeu com erro. Consulte o resumo da execução."
+                exit 1
+              fi
+              exit 0
+            fi
+          done
+
+          echo "Sem resposta do Codespace em aproximadamente dois minutos."
+          echo "Verifique se a ponte está ativa no Codespaces (bash bridge/start.sh)." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
