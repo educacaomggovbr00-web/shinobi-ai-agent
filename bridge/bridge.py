@@ -114,13 +114,24 @@ def run(command):
         if parsed.hostname not in ("discord.com", "www.discord.com") or not parsed.path.startswith("/channels/1515877468299595919/"):
             raise ValueError("Text reading limited to accessible Naruto Project RP channels, not DMs or login pages")
         activate()
-        xdo("key", "--clearmodifiers", "Escape")
-        xdo("key", "--clearmodifiers", "ctrl+a")
-        xdo("key", "--clearmodifiers", "ctrl+c")
-        time.sleep(0.4)
-        value = shell(["xclip", "-selection", "clipboard", "-o"], timeout=6)
-        return {"current_url": url, "text": value.strip()[:4500],
-                "note": "Copied selectable page text; virtualized posts may be omitted."}
+        # Firefox sometimes leaves focus in the address bar after Ctrl+L.
+        # F6 switches browser focus between address bar and document.
+        # Never report the URL as chat content.
+        value = ""
+        for _ in range(3):
+            xdo("key", "--clearmodifiers", "Escape")
+            xdo("key", "--clearmodifiers", "F6")
+            time.sleep(0.2)
+            xdo("key", "--clearmodifiers", "ctrl+a")
+            xdo("key", "--clearmodifiers", "ctrl+c")
+            time.sleep(0.35)
+            value = shell(["xclip", "-selection", "clipboard", "-o"], timeout=6)
+            if len(value.strip()) > len(url) + 80 and value.strip() != url:
+                break
+        if not value.strip() or value.strip() == url:
+            raise RuntimeError("Firefox copied only the URL; could not focus/select channel messages.")
+        return {"current_url": url, "text": value.strip()[-7500:],
+                "note": "Copied selectable page text after moving focus to document; virtualized posts may be omitted."}
     if action == "scroll":
         direction, amount = command.get("direction", "down"), int(command.get("amount", 3))
         if direction not in ("up", "down") or not 1 <= amount <= 8:
