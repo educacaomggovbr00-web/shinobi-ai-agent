@@ -101,23 +101,26 @@ def process(*args, env=None):
 
 async def start():
     secret = secrets.token_urlsafe(40)
-    env = os.environ.copy()
+    # Do not pass GitHub API credentials to any browser/desktop subprocess.
+    privileged = {"GH_TOKEN", "GITHUB_TOKEN", "ACTIONS_RUNTIME_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"}
+    env = {k: v for k, v in os.environ.items() if k not in privileged}
     env["DISPLAY"] = DISPLAY
     processes = []
     browser_profile = Path("/tmp/bushin-private-discord-profile")
     browser_profile.mkdir(mode=0o700, parents=True, exist_ok=True)
+    controller_task = None
 
     try:
         if not Path(VNC_DIR, "vnc.html").is_file():
             raise RuntimeError("Arquivos noVNC nao encontrados")
-        processes.append(process("Xvfb", DISPLAY, "-screen", "0", "1365x768x24", "-nolisten", "tcp"))
+        processes.append(process("Xvfb", DISPLAY, "-screen", "0", "1365x768x24", "-nolisten", "tcp", env=env))
         await asyncio.sleep(2)
         processes.append(process("openbox", env=env))
         processes.append(process(
             "x11vnc", "-display", DISPLAY, "-localhost", "-forever",
             "-shared", "-nopw", "-rfbport", "5900", "-quiet", env=env))
         processes.append(process(
-            "websockify", "--web", VNC_DIR, "127.0.0.1:6081", "127.0.0.1:5900"))
+            "websockify", "--web", VNC_DIR, "127.0.0.1:6081", "127.0.0.1:5900", env=env))
 
         # Chromium binary installed by the Playwright setup step.
         from playwright.async_api import async_playwright
@@ -126,6 +129,7 @@ async def start():
         await pw.stop()
         processes.append(process(
             chromium_bin, "--no-sandbox", "--disable-dev-shm-usage",
+            "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=9222",
             "--no-first-run", "--disable-default-apps", "--disable-features=MediaRouter",
             "--user-data-dir=" + str(browser_profile), "--window-size=1300,720",
             LOGIN_URL, env=env))
@@ -141,7 +145,7 @@ async def start():
         tunnel = subprocess.Popen(
             [tunnel_bin, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:" + str(PORT)],
             text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            bufsize=1, start_new_session=True)
+            bufsize=1, start_new_session=True, env=env)
         processes.append(tunnel)
 
         loop = asyncio.get_running_loop()
@@ -180,9 +184,14 @@ async def start():
         print("NAO compartilhe este link. Ele controla a tela do Linux com acesso ao Discord.", flush=True)
         print("O desktop nao sera salvo nem tera suas senhas enviadas ao repositorio.", flush=True)
 
+        # Authenticated GitHub command queue, independent from private VNC link.
+        from live_controller import listen_commands
+        controller_task = asyncio.create_task(listen_commands())
         started = time.monotonic()
         while time.monotonic() - started < MAX_SECONDS:
             await asyncio.sleep(30)
+            if controller_task.done():
+                raise RuntimeError("The browser command receiver stopped")
             if tunnel.poll() is not None:
                 raise RuntimeError("Tunel seguro foi encerrado")
             if any(p.poll() is not None for p in processes[:4]):
@@ -192,6 +201,9 @@ async def start():
                 print("🍥 Linux online - %s min decorridos" % minutes, flush=True)
         print("Limite da sessao encerrado. Fechando navegador.", flush=True)
     finally:
+        if controller_task is not None:
+            controller_task.cancel()
+            await asyncio.gather(controller_task, return_exceptions=True)
         for p in reversed(processes):
             if p.poll() is None:
                 try:
