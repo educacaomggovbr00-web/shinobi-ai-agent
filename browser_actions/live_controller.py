@@ -141,7 +141,8 @@ async def perform(action, command):
                 return {"url": redacted_page_url(page.url), "title": (await page.title())[:180]}
             raise ValueError("Unsupported action")
         finally:
-            await browser.close()
+            # Disconnecting the CDP client must not shut down the user's Chromium window.
+            pass
 
 async def listen_commands():
     run_id = os.environ.get("GITHUB_RUN_ID")
