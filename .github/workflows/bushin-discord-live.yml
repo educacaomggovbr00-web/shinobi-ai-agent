@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: bushin-discord-interactive-desktop
@@ -25,7 +25,10 @@ jobs:
           python-version: '3.11'
 
       - name: "Conferir script do desktop"
-        run: python -m py_compile browser_actions/live_desktop.py
+        run: |
+          python -m py_compile browser_actions/live_desktop.py
+          python -m py_compile browser_actions/live_controller.py
+          python -m unittest discover -s browser_actions -p 'test_live_controller.py' -v
 
       - name: "Instalar Linux grafico e noVNC"
         shell: bash
@@ -50,6 +53,7 @@ jobs:
       - name: "🍥 Linux AO VIVO — abrir link nos logs ou resumo"
         env:
           CLOUDFLARED_BIN: ${{ runner.temp }}/cloudflared
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
