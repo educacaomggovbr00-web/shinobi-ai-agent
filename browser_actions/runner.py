@@ -66,67 +66,68 @@ def main():
     (out / "video").mkdir(parents=True, exist_ok=True)
     report = {"start_url": args.url, "steps_requested": len(steps), "actions": [], "ok": False}
     browser = context = page = None
+    pw = None
     error = None
     try:
         from playwright.sync_api import sync_playwright
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
-            context = browser.new_context(
-                viewport={"width": 1365, "height": 768}, accept_downloads=False,
-                record_video_dir=str(out / "video"),
-                record_video_size={"width": 1365, "height": 768})
-            page = context.new_page()
-            page.set_default_timeout(8000)
-            def guard(route):
-                try:
-                    check_url(route.request.url, main=False)
-                    route.continue_()
-                except ValueError:
-                    route.abort()
-            page.route("**/*", guard)
-            print("Bushin: abrindo navegador Chromium temporário", flush=True)
-            page.goto(args.url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(1000)
-            for idx, step in enumerate(steps, 1):
-                action = step["action"]
-                print("Passo %s/%s: %s" % (idx, len(steps), action), flush=True)
-                if action == "goto":
-                    page.goto(step["url"], wait_until="domcontentloaded", timeout=30000)
-                elif action == "click":
-                    page.locator(step["selector"]).first.click()
-                elif action == "fill":
-                    target = page.locator(step["selector"]).first
-                    kind = (target.get_attribute("type") or "").lower()
-                    ac = (target.get_attribute("autocomplete") or "").lower()
-                    if kind in ("password", "hidden") or ac in ("one-time-code", "cc-number", "cc-csc"):
-                        raise ValueError("Campo sensível bloqueado: não forneça credenciais no Actions")
-                    target.fill(step["text"])
-                elif action == "press":
-                    if "selector" in step:
-                        page.locator(step["selector"]).first.press(step["key"])
-                    else:
-                        page.keyboard.press(step["key"])
-                elif action == "scroll":
-                    page.mouse.wheel(0, step.get("pixels", 500))
-                elif action == "wait":
-                    page.wait_for_timeout(step.get("ms", 500))
-                elif action == "extract":
-                    value = page.locator(step.get("selector", "body")).first.inner_text(timeout=8000)
-                    (out / ("texto_passo_%s.txt" % idx)).write_text(value[:12000], encoding="utf-8")
-                elif action == "screenshot":
-                    page.screenshot(path=str(out / ("passo_%s.png" % idx)), full_page=False)
-                page.wait_for_timeout(350)
-                if page.url.startswith(("http://", "https://")):
-                    check_url(page.url, main=False)
-                elif page.url != "about:blank":
-                    raise ValueError("Redirecionamento para URL não permitida")
-                report["actions"].append({"step": idx, "action": action, "ok": True, "url": page.url[:1600]})
-            report["ok"] = True
+        pw = sync_playwright().start()
+        browser = pw.chromium.launch(headless=True, args=["--no-sandbox"])
+        context = browser.new_context(
+            viewport={"width": 1365, "height": 768}, accept_downloads=False,
+            record_video_dir=str(out / "video"),
+            record_video_size={"width": 1365, "height": 768})
+        page = context.new_page()
+        page.set_default_timeout(8000)
+        def guard(route):
             try:
-                content = page.locator("body").inner_text(timeout=4500)
-                (out / "pagina.txt").write_text(content[:12000], encoding="utf-8")
-            except Exception:
-                pass
+                check_url(route.request.url, main=False)
+                route.continue_()
+            except ValueError:
+                route.abort()
+        page.route("**/*", guard)
+        print("Bushin: abrindo navegador Chromium temporário", flush=True)
+        page.goto(args.url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(1000)
+        for idx, step in enumerate(steps, 1):
+            action = step["action"]
+            print("Passo %s/%s: %s" % (idx, len(steps), action), flush=True)
+            if action == "goto":
+                page.goto(step["url"], wait_until="domcontentloaded", timeout=30000)
+            elif action == "click":
+                page.locator(step["selector"]).first.click()
+            elif action == "fill":
+                target = page.locator(step["selector"]).first
+                kind = (target.get_attribute("type") or "").lower()
+                ac = (target.get_attribute("autocomplete") or "").lower()
+                if kind in ("password", "hidden") or ac in ("one-time-code", "cc-number", "cc-csc"):
+                    raise ValueError("Campo sensível bloqueado: não forneça credenciais no Actions")
+                target.fill(step["text"])
+            elif action == "press":
+                if "selector" in step:
+                    page.locator(step["selector"]).first.press(step["key"])
+                else:
+                    page.keyboard.press(step["key"])
+            elif action == "scroll":
+                page.mouse.wheel(0, step.get("pixels", 500))
+            elif action == "wait":
+                page.wait_for_timeout(step.get("ms", 500))
+            elif action == "extract":
+                value = page.locator(step.get("selector", "body")).first.inner_text(timeout=8000)
+                (out / ("texto_passo_%s.txt" % idx)).write_text(value[:12000], encoding="utf-8")
+            elif action == "screenshot":
+                page.screenshot(path=str(out / ("passo_%s.png" % idx)), full_page=False)
+            page.wait_for_timeout(350)
+            if page.url.startswith(("http://", "https://")):
+                check_url(page.url, main=False)
+            elif page.url != "about:blank":
+                raise ValueError("Redirecionamento para URL não permitida")
+            report["actions"].append({"step": idx, "action": action, "ok": True, "url": page.url[:1600]})
+        report["ok"] = True
+        try:
+            content = page.locator("body").inner_text(timeout=4500)
+            (out / "pagina.txt").write_text(content[:12000], encoding="utf-8")
+        except Exception:
+            pass
     except Exception as exc:
         error = type(exc).__name__ + ": " + str(exc)[:700]
         report["error"] = error
@@ -147,6 +148,11 @@ def main():
         if browser:
             try:
                 browser.close()
+            except Exception:
+                pass
+        if pw:
+            try:
+                pw.stop()
             except Exception:
                 pass
         (out / "relatorio.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
