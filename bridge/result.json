@@ -1,12 +1,9 @@
 {
-  "id": "firefox-status-20261018-003",
-  "action": "status",
+  "id": "discord-url-20261018-004",
+  "action": "get_url",
   "ok": true,
   "data": {
-    "connected": true,
-    "display": ":1",
-    "firefox_window": true,
-    "window_title": "Discord — Mozilla Firefox"
+    "current_url": "https://discord.com/login?redirect_to=%2Fchannels%2F1515877468299595919"
   },
-  "finished_at_utc": "2026-10-18T21:37:27.797848+00:00"
+  "finished_at_utc": "2026-10-18T21:37:45.933837+00:00"
 }
