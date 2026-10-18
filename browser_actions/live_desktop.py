@@ -35,7 +35,7 @@ def make_app(secret):
             response = web.HTTPFound("/vnc.html?autoconnect=1&resize=scale")
             response.set_cookie(
                 "bushin_session", secret, max_age=MAX_SECONDS,
-                secure=True, httponly=True, samesite="Strict", path="/")
+                secure=True, httponly=True, samesite="Lax", path="/")
             return response
 
         if not safe_equal(request.cookies.get("bushin_session", ""), secret):
@@ -82,7 +82,7 @@ def make_app(secret):
 
         if request.method != "GET":
             return web.Response(status=405, text="Metodo nao permitido")
-        async with ClientSession(timeout=ClientTimeout(total=30)) as session:
+        async with ClientSession(timeout=ClientTimeout(total=30), auto_decompress=False) as session:
             async with session.get(BACKEND + str(request.rel_url), allow_redirects=False) as upstream:
                 payload = await upstream.read()
                 response = web.Response(body=payload, status=upstream.status)
@@ -165,7 +165,7 @@ async def start():
         summary = (
             "## 🍥 Bushin Discord — desktop AO VIVO\n\n"
             "**Acesso privado (nao compartilhe):**\n\n"
-            f"[Abrir Firefox Linux para fazer login no Discord]({user_url})\n\n"
+            f"[Abrir navegador Linux para fazer login no Discord]({user_url})\n\n"
             "A janela do navegador abre o site do Discord. Entre e confirme 2FA apenas nela.\n\n"
             "**Seguranca:** link temporario autenticado, HTTPS, navegador sem gravacao "
             "ou exportacao de cookies. Quem tiver acesso ao link podera controlar a sessao.\n\n"
@@ -177,7 +177,7 @@ async def start():
         print("🍥 LINK PRIVADO - ABRA PARA FAZER LOGIN", flush=True)
         print(user_url, flush=True)
         print("========================================================", flush=True)
-        print("NAO compartilhe este link. Ele controla o Firefox com acesso ao Discord.", flush=True)
+        print("NAO compartilhe este link. Ele controla a tela do Linux com acesso ao Discord.", flush=True)
         print("O desktop nao sera salvo nem tera suas senhas enviadas ao repositorio.", flush=True)
 
         started = time.monotonic()
