@@ -1,0 +1,12 @@
+{
+  "id": "setup-check-20261018-001",
+  "action": "status",
+  "ok": true,
+  "data": {
+    "connected": true,
+    "display": ":1",
+    "firefox_window": false,
+    "window_title": null
+  },
+  "finished_at_utc": "2026-10-18T21:32:03.241238+00:00"
+}
