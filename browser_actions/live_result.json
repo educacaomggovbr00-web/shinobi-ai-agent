@@ -1,0 +1,7 @@
+{
+  "id": "idle",
+  "session_id": "none",
+  "action": "status",
+  "ok": false,
+  "note": "No live command has been executed. Start a new Bushin Discord Linux workflow after installing controller."
+}
