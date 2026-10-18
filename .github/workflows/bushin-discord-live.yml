@@ -1,0 +1,59 @@
+name: "🍥 Bushin — Discord Linux AO VIVO"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bushin-discord-interactive-desktop
+  cancel-in-progress: false
+
+jobs:
+  desktop:
+    name: "Desktop Linux interativo — Discord"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: "Carregar projeto Bushin"
+        uses: actions/checkout@v4
+
+      - name: "Preparar Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Conferir script do desktop"
+        run: python -m py_compile browser_actions/live_desktop.py
+
+      - name: "Instalar Linux grafico e noVNC"
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            --no-install-recommends xvfb x11vnc openbox novnc websockify
+          python -m pip install 'aiohttp==3.11.18' 'playwright==1.56.0'
+          python -m playwright install chromium --with-deps
+
+      - name: "Preparar tunel HTTPS efemero"
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            --output "$RUNNER_TEMP/cloudflared"
+          chmod 700 "$RUNNER_TEMP/cloudflared"
+          "$RUNNER_TEMP/cloudflared" --version
+
+      - name: "🍥 Linux AO VIVO — abrir link nos logs ou resumo"
+        env:
+          CLOUDFLARED_BIN: ${{ runner.temp }}/cloudflared
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "🍥 Linux temporario iniciando, com Discord na tela."
+          echo "Aguarde o LINK PRIVADO aparecer nos logs deste passo."
+          echo "Nunca compartilhe o link. Quem tiver acesso pode controlar o navegador."
+          python -u browser_actions/live_desktop.py
