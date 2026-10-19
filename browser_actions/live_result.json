@@ -1,8 +1,12 @@
 {
-  "id": "bushin-39184315765-inspect-ui-05",
+  "id": "bushin-live-confirm-39184315765-20261019-01",
   "session_id": "39184315765",
-  "action": "inspect_ui",
-  "ok": false,
-  "error": "Mouse and keyboard control only allowed inside Naruto Project RP",
-  "finished_at_utc": "2026-10-19T01:25:25.681375+00:00"
+  "action": "status",
+  "ok": true,
+  "data": {
+    "online": true,
+    "url": "https://discord.com/login",
+    "title": "Discord"
+  },
+  "finished_at_utc": "2026-10-19T01:26:24.869188+00:00"
 }
