@@ -65,3 +65,11 @@ test("Logout with an empty mobile cookie does not change unrelated sessions",asy
   assert.equal(result.status,303);
   assert.equal(deleted.length,0);
 });
+
+test("Mobile portal allows only same-origin Referer so Android forms can pass CSRF validation",async()=>{
+  const {env}=envAndDatabase();
+  const response=await worker.fetch(new Request(base+"/mobile"),env);
+  assert.equal(response.status,200);
+  assert.equal(response.headers.get("referrer-policy"),"same-origin");
+  assert.match(response.headers.get("content-security-policy")||"",/form-action 'self'/);
+});
