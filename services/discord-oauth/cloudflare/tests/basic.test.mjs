@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
+import {createHash} from "node:crypto";
 import worker,{allowedRedirect,validScope,pkceVerify,classifyDiscordTokenFailure,personalCommandsConsentUrl} from "../src/worker.mjs";
 
 test("Only ChatGPT official callback paths accepted",()=>{
@@ -95,4 +96,30 @@ test("Personal commands consent requires existing mobile session, preserving ori
  assert.equal(denied.status,303);
  assert.equal(denied.headers.get("location"),"/mobile");
  assert.equal(denied.headers.get("set-cookie"),null);
+});
+
+test("Only an authenticated mobile session can start the personal command install",async()=>{
+ const base="https://bushin-owner.workers.dev";
+ const token="a".repeat(52);
+ const hash=createHash("sha256").update(token).digest("base64url");
+ const env={
+   PUBLIC_BASE_URL:base,DISCORD_CLIENT_SECRET:"fake-ci-only",
+   ENCRYPTION_KEY_BASE64:"fake-ci-only",BUSHIN_OWNER_DISCORD_ID:"123456789012345678",
+   DB:{prepare(sql){
+     assert.match(sql,/FROM mobile_user_sessions/);
+     return {bind(...args){
+       assert.equal(args[0],hash);
+       return {first:async()=>({user_id:"123456789012345678"})};
+     }};
+   }}
+ };
+ const consent=await worker.fetch(new Request(base+"/mobile/commands",{
+   headers:{cookie:"__Host-bushin_mobile="+token}
+ }),env);
+ assert.equal(consent.status,303);
+ const u=new URL(consent.headers.get("location"));
+ assert.equal(u.host,"discord.com");
+ assert.equal(u.searchParams.get("scope"),"applications.commands");
+ assert.equal(u.searchParams.get("integration_type"),"1");
+ assert.equal(consent.headers.get("set-cookie"),null);
 });
