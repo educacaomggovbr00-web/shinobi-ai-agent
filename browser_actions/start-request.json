@@ -1,4 +1,7 @@
 {
-  "requested": false,
-  "note": "Use a confirmed update to this file to start an ephemeral GitHub Actions browser; no Discord credentials are stored here."
+  "requested": true,
+  "request_id": "bushin-visual-oidc-20261019-001",
+  "purpose": "Teste solicitado de controle visual do Bushin no Android via Cloudflare",
+  "safe_login": "Login somente pela sessão HTTPS privada do GitHub Actions",
+  "no_auto_discord_message": true
 }
