@@ -73,12 +73,20 @@ class BushinRemoteTests(unittest.TestCase):
         for coords in ((-1,0), (1365,0), (0,768), ("5",5), (True,10)):
             with self.subTest(coords=coords), self.assertRaises(ValueError):
                 validate_command({"id":"work2", "session_id":RUN, "action":"click", "x":coords[0], "y":coords[1]}, RUN)
-        for key in ("Enter", "Control+V", "Control+Shift+I", "Delete", "Space"):
+        for key in ("Control+V", "Control+Shift+I", "Delete", "Space"):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 validate_command({"id":"work3", "session_id":RUN, "action":"press", "key":key}, RUN)
         for text in ("", "x"*101, "hello\\nworld"):
             with self.subTest(search=text), self.assertRaises(ValueError):
                 validate_command({"id":"work4", "session_id":RUN, "action":"type_search", "text":text}, RUN)
+
+    def test_tabs_and_safe_enter(self):
+        self.assertEqual(validate_command({"id":"tabs1","session_id":RUN,"action":"tabs"},RUN),"tabs")
+        self.assertEqual(validate_command({"id":"tabs2","session_id":RUN,"action":"tabs","tab_index":1},RUN),"tabs")
+        for bad in (-1,21,True,"1"):
+            with self.assertRaises(ValueError):
+                validate_command({"id":"tabs3","session_id":RUN,"action":"tabs","tab_index":bad},RUN)
+        self.assertEqual(validate_command({"id":"key1","session_id":RUN,"action":"press","key":"Enter"},RUN),"press")
 
     def test_scroll_limits(self):
         for amount in (-1, 0, 9, 1.4, "3", True):
@@ -140,6 +148,32 @@ class BushinRemoteTests(unittest.TestCase):
                 validate_command({**command, "urls": urls}, RUN)
         with self.assertRaises(ValueError):
             validate_command({**command, "session_id":"different"}, RUN)
+
+class BushinTabTests(unittest.IsolatedAsyncioTestCase):
+    async def test_only_authorized_discord_rp_tabs_appear(self):
+        from live_controller import safe_tabs
+        class Page:
+            def __init__(self,url):
+                self.url=url;self.focused=False
+            async def title(self):return "Tab"
+            async def bring_to_front(self):self.focused=True
+        pages=[
+           Page("https://discord.com/channels/@me/123456789012345678"),
+           Page("https://discord.com/channels/1515877468299595919/1520116350360617154"),
+           Page("https://discord.com/channels/999999999999999999/1520116350360617154"),
+           Page("https://discord.com/channels/1515877468299595919/1520114256740352061")
+        ]
+        class Context:pass
+        c=Context();c.pages=pages
+        class Browser:pass
+        b=Browser();b.contexts=[c]
+        result=await safe_tabs(b,1)
+        self.assertEqual(result["count"],2)
+        self.assertTrue(pages[3].focused)
+        self.assertNotIn("@me",str(result))
+        self.assertNotIn("/999999999999999999/",str(result))
+        with self.assertRaises(ValueError):
+            await safe_tabs(b,2)
 
 class BushinScoutNavigationTests(unittest.IsolatedAsyncioTestCase):
     async def test_restores_channel_even_if_one_read_fails(self):
