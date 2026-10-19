@@ -7,7 +7,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: bushin-discord-interactive-desktop-v12
+  group: bushin-discord-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
