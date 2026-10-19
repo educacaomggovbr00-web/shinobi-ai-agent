@@ -70,6 +70,8 @@ test("Discord OAuth diagnostics never disclose secrets or provider descriptions"
  for(const [status,provider,expected] of cases){
    const category=classifyDiscordTokenFailure(status,provider);
    assert.equal(category,expected);
-   assert.ok(!category.includes(provider)||["invalid_client","invalid_grant","invalid_request","invalid_scope"].includes(provider));
+   assert.match(category,/^discord_[a-z_]+$/);
+   assert.ok(!category.includes("secret-or-auth-header"));
+   assert.ok(!category.includes("raw-secret-or-customer-token"));
  }
 });
