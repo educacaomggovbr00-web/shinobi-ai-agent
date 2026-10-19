@@ -12,7 +12,7 @@ import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
 import {logToolAction,stateCall} from "./state-suite.mjs";
-import {discordCall,officialBotDmReady} from "./discord-suite.mjs";
+import {discordCall,officialBotDmReady,officialBotIdentity} from "./discord-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
 const SCOPES=["identify","guilds","guilds.members.read"];
@@ -419,7 +419,7 @@ async function mobileHome(req,env){
    if(row?.user_id===env.BUSHIN_OWNER_DISCORD_ID){
      try{const c=await unseal(row.creds_encrypted,env);if(c.expires>now()+30000){
        const me=await verified(env,c);
-       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/workspace">Tarefas e memória — usar agora</a><a class="button" href="/mobile/servers">Meus servidores Discord</a><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
+       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/dm">DM de teste do Bushin</a><a class="button" href="/mobile/workspace">Tarefas e memória — usar agora</a><a class="button" href="/mobile/servers">Meus servidores Discord</a><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
      }}catch{}
    }
  }
@@ -459,7 +459,7 @@ async function mobileFeatures(req,env){
  '<p class="muted">Configure apenas pela interface segura, nunca envie Bot Token no chat.</p>'+
  '<a href="https://discord.com/developers/applications/1561589128108314636/bot">Abrir Bot no Discord Developer Portal</a></details>';
  const note=dmNote+'<p class="muted">OAuth identifica você e libera a solicitação de comandos pessoais. Não permite enviar mensagens como conta de usuário. O modo Android permanece skill-only. As ferramentas MCP continuam indisponíveis no aplicativo ChatGPT Android enquanto o plugin original não estiver instalado/conectado.</p>';
- return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
+ return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/dm">Diagnóstico e DM de teste</a><a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
 }
 
 async function mobileSessionOwner(req,env){
@@ -563,6 +563,76 @@ async function mobileServers(req,env){
  }
 }
 
+async function mobileDm(req,env){
+ const record=await mobileSessionOwner(req,env);
+ if(!record)return mGo("/mobile");
+ const owner=record.user_id;
+ const origin=ready(env);
+ const context={me:{id:owner}};
+ let status="";
+ if(req.method==="POST"){
+   if(req.headers.get("origin")!==origin)return reply({error:"Invalid request origin"},403);
+   if(!(req.headers.get("content-type")||"").startsWith("application/x-www-form-urlencoded"))
+     return reply({error:"Use form encoding"},415);
+   const raw=await req.text();
+   if(raw.length>2000)return reply({error:"Message too long"},413);
+   const p=new URLSearchParams(raw);
+   if(p.get("op")!=="send_test"||p.get("confirmed")!=="yes")
+     return reply({error:"Explicit DM confirmation required"},400);
+   const content=String(p.get("message")||"").trim();
+   if(!content||content.length>300||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(content))
+     return reply({error:"Message must contain 1–300 ordinary characters"},400);
+   if(!officialBotDmReady(env))return mGo("/mobile/dm?result=not_configured");
+   // Rate limit is deliberately persistent across browser reloads and sessions.
+   const day=(await q(env,"SELECT COUNT(*) AS n FROM bushin_events WHERE owner_id=? AND action='mobile_dm_attempt' AND created_at>?",owner,now()-86400000).first())?.n||0;
+   const minuteCount=(await q(env,"SELECT COUNT(*) AS n FROM bushin_events WHERE owner_id=? AND action='mobile_dm_attempt' AND created_at>?",owner,now()-60000).first())?.n||0;
+   if(Number(day)>=5||Number(minuteCount)>=1)return mGo("/mobile/dm?result=rate_limited");
+   await q(env,"INSERT INTO bushin_events (owner_id,task_id,action,summary,created_at) VALUES (?,?,?,?,?)",
+     owner,null,"mobile_dm_attempt","DM de teste para o proprietário verificado; conteúdo não armazenado",now()).run();
+   try{
+     const bot=await officialBotIdentity(env);
+     if(!bot.verified) return mGo("/mobile/dm?result=bot_invalid");
+     const result=await discordCall(env,"discord_send_dm",{recipient_id:owner,content,confirmed:true},context);
+     if(result?.sent!==true)return mGo("/mobile/dm?result=not_sent");
+     await q(env,"INSERT INTO bushin_events (owner_id,task_id,action,summary,created_at) VALUES (?,?,?,?,?)",
+       owner,null,"mobile_dm_sent","Uma DM enviada pelo bot oficial; conteúdo não armazenado",now()).run();
+     return mGo("/mobile/dm?result=sent");
+   }catch{
+     // Do not log or echo Discord upstream responses or the DM text.
+     await q(env,"INSERT INTO bushin_events (owner_id,task_id,action,summary,created_at) VALUES (?,?,?,?,?)",
+       owner,null,"mobile_dm_failed","Falha no envio de DM pelo bot oficial; sem repetição automática",now()).run();
+     return mGo("/mobile/dm?result=failed");
+   }
+ }
+ if(req.method!=="GET")return reply({error:"Method not allowed"},405);
+ const bot=await officialBotIdentity(env).catch(()=>({configured:true,verified:false,reason:"Discord indisponível no momento."}));
+ const result=new URL(req.url).searchParams.get("result");
+ const messages={
+   sent:"✓ Discord confirmou o envio de uma DM pelo bot Bushin. Verifique sua caixa de mensagens.",
+   failed:"Discord não confirmou o envio. Nenhuma repetição automática será feita.",
+   bot_invalid:"O Discord não reconheceu o token do bot. Atualize o segredo somente no painel da Cloudflare.",
+   not_configured:"Ainda falta o segredo DISCORD_BOT_TOKEN na Cloudflare.",
+   not_sent:"O bot não confirmou o envio.",
+   rate_limited:"Por segurança: no máximo uma tentativa por minuto e cinco por dia."
+ };
+ status=result&&Object.hasOwn(messages,result)?'<p class="muted">'+mEsc(messages[result])+'</p>':"";
+ const info=bot.verified?
+   '<p class="ok">✓ Bot Discord validado: '+mEsc(bot.username)+'</p>':
+   '<p class="muted">'+mEsc(bot.configured?(bot.reason||"Bot não validado."):"Bot oficial ainda não configurado.")+'</p>';
+ const form=bot.verified?
+   '<form method="post" action="/mobile/dm" style="margin-top:14px">'+
+   '<input type="hidden" name="op" value="send_test">'+
+   '<label>Mensagem de teste (até 300 caracteres)<textarea name="message" rows="3" maxlength="300" required style="display:block;background:#0b1020;color:white;border:1px solid #526483;border-radius:8px;padding:12px;box-sizing:border-box;width:100%;margin-top:8px" placeholder="Olá! Testando o Bushin."></textarea></label>'+
+   '<label style="display:block;margin-top:12px"><input type="checkbox" name="confirmed" value="yes" required> Confirmo o envio de UMA DM para minha própria conta Discord, em nome do bot Bushin.</label>'+
+   '<button class="button" type="submit">Enviar uma DM de teste</button></form>':
+   '<p>Para habilitar o teste, abra o Discord Developer Portal, selecione o aplicativo Bushin e configure o Bot Token como segredo na Cloudflare. Não cole nenhuma chave neste chat.</p>'+
+   '<a class="button" href="https://discord.com/developers/applications/1561589128108314636/bot">Configurar meu bot no Discord</a>'+
+   '<a class="button" href="https://dash.cloudflare.com/">Abrir Cloudflare — Variables and Secrets</a>';
+ return mPage("Bushin — DM de teste",'<p class="ok">✓ Conta pessoal confirmada pelo OAuth.</p>'+
+   '<p>O teste usa a API de um bot oficial e envia apenas para a sua própria conta. Não envia como seu usuário e não libera canais do Naruto RP.</p>'+info+status+form+
+   '<p class="muted">O Discord pode recusar DMs de bots se eles não compartilharem servidor ou se o usuário bloquear DMs. Nenhum envio é feito ao abrir esta página.</p>'+
+   '<a class="button" href="/mobile/features">Voltar às ferramentas</a>');
+}
 async function mobilePersonalCommands(req,env){
  ready(env);
  const session=mCookie(req,M_SESSION);
@@ -618,6 +688,7 @@ export default {
       if(path==="/mobile/features"&&req.method==="GET")return await mobileFeatures(req,env);
       if(path==="/mobile/workspace"&&["GET","POST"].includes(req.method))return await mobileWorkspace(req,env);
       if(path==="/mobile/servers"&&req.method==="GET")return await mobileServers(req,env);
+      if(path==="/mobile/dm"&&["GET","POST"].includes(req.method))return await mobileDm(req,env);
       if(path==="/mobile/commands"&&req.method==="GET")return await mobilePersonalCommands(req,env);
       if(path==="/mobile/start"&&req.method==="GET")return await mobileStart(req,env);
       if(path==="/mobile/logout"&&req.method==="POST")return await mobileLogout(req,env);
