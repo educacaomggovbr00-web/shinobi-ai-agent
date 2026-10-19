@@ -10,6 +10,7 @@
  */
 import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
+import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
 const SCOPES=["identify","guilds","guilds.members.read"];
@@ -341,11 +342,11 @@ async function mcp(req,env){
   if(method==="initialize")return rpc(id,{
     protocolVersion:"2025-06-18",capabilities:{tools:{listChanged:false}},
     serverInfo:{name:"bushin-browser-discord-direct",version:"1.0.0"},
-    instructions:"Discord OAuth verifica o proprietário. O controle visual opcional usa uma sessão navegador separada, ações limitadas a leitura e navegação. Envio de mensagens só por bot oficial autorizado, nunca como conta pessoal."
+    instructions:"Bushin Advanced: browser, Discord OAuth, bot oficial opcional, tarefas persistidas no D1, arquivos e GitHub. Ferramentas registradas não garantem sessão ativa; confira os estados retornados. O aplicativo ChatGPT Android skill-only não invoca este MCP. Mensagens Discord por API usam apenas bot oficialmente autorizado."
   });
   if(method==="notifications/initialized")return new Response(null,{status:202});
   if(method==="ping")return rpc(id,{});
-  const activeTools=TOOLS.concat(BROWSER_TOOLS,botReady(env)?BOT_TOOLS:[]);
+  const activeTools=TOOLS.concat(BROWSER_TOOLS,botReady(env)?BOT_TOOLS:[],ADVANCED_TOOLS);
   if(method==="tools/list")return rpc(id,{tools:activeTools});
   if(method==="tools/call"){
     const auth=await session(req,env);
@@ -357,6 +358,7 @@ async function mcp(req,env){
     try{
       const me=await verified(env,auth.creds);
       const data=name==="bushin_discord_profile"?discordProfileData(me):
+        ADVANCED_NAMES.has(name)?await advancedCall(env,name,body.params?.arguments||{},{me,creds:auth.creds}):
         BROWSER_TOOLS.some(t=>t.name===name)?await browserCall(env,name,body.params?.arguments||{}):
         BOT_TOOLS.some(t=>t.name===name)?await botCall(env,name,body.params?.arguments||{}):
         name==="bushin_discord_whoami"?
