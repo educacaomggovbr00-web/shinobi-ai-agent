@@ -54,7 +54,7 @@ const resource = publicBase + "/mcp";
 const metadataUrl = publicBase + "/.well-known/oauth-protected-resource";
 app.get("/health", (_req,res) => res.set("Cache-Control","no-store").json({
   service:"Bushin Browser Discord MCP", client_id:APPLICATION_CLIENT_ID,
-  oauth_configured:true, connected:false,
+  oauth_provider:"discord", login_required:true,
   detail:"Serviço disponível; autorização da conta deve ser verificada por ferramenta autenticada."
 }));
 app.get("/.well-known/oauth-protected-resource", (_req,res) => res.set("Cache-Control","no-store").json({
@@ -72,7 +72,7 @@ app.post("/mcp", async (req,res) => {
   const transport=new StreamableHTTPServerTransport({
     sessionIdGenerator:undefined, enableJsonResponse:true
   });
-  res.on("close",()=> {transport.close().catch(()=>{});server.close().catch(()=>{});});
+  res.on("close",()=> {Promise.resolve(transport.close()).catch(()=>{});Promise.resolve(server.close()).catch(()=>{});});
   try {
     await server.connect(transport);
     await transport.handleRequest(req,res,req.body);
