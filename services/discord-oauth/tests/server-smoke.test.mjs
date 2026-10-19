@@ -108,7 +108,7 @@ test("Visual browser tools require explicit opt-in with hosting credential",asyn
      headers:{"content-type":"application/json","accept":"application/json, text/event-stream"},
      body:JSON.stringify({jsonrpc:"2.0",id:2,method:"tools/list",params:{}})
    });
-   assert.equal(result.status,200,await result.text().catch(()=>""));
+   assert.equal(result.status,200);
    const body=await result.text();
    assert.match(body,/bushin_discord_whoami/);
    assert.match(body,/bushin_browser_screenshot/);
