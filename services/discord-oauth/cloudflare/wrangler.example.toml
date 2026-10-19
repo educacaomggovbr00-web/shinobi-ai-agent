@@ -1,0 +1,16 @@
+# Rename/copy to wrangler.toml after creating a Cloudflare D1 database.
+# Never use fake database IDs, domains or production secrets in deployed config.
+name = "bushin-discord-direct"
+main = "src/worker.mjs"
+compatibility_date = "2026-10-19"
+workers_dev = true
+
+[vars]
+# Replace this placeholder with the exact Cloudflare workers.dev production URL:
+PUBLIC_BASE_URL = "https://YOUR-REAL-SUBDOMAIN.workers.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bushin-discord-auth"
+# Obtain with: npx wrangler d1 create bushin-discord-auth
+database_id = "REPLACE-WITH-REAL-CLOUDFLARE-D1-DATABASE-ID"
