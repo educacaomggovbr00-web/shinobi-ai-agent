@@ -1,8 +1,12 @@
 {
-  "id": "bushin-v15-real-discord-shot-39184315765-03",
+  "id": "bushin-v15-after-navigation-39184315765-04",
   "session_id": "39184315765",
-  "action": "screenshot",
-  "ok": false,
-  "error": "Capture denied: open an authorized Naruto Project RP channel first",
-  "finished_at_utc": "2026-10-19T01:15:54.032351+00:00"
+  "action": "status",
+  "ok": true,
+  "data": {
+    "online": true,
+    "url": "https://discord.com/login",
+    "title": "Discord"
+  },
+  "finished_at_utc": "2026-10-19T01:16:28.652388+00:00"
 }
