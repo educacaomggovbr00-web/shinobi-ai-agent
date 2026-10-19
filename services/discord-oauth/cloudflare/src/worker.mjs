@@ -324,7 +324,21 @@ function mPage(title,content){
 function mGo(to,cookies=[]){const h=new Headers({"location":to,"cache-control":"no-store","referrer-policy":"no-referrer"});for(const c of cookies)h.append("set-cookie",c);return new Response(null,{status:303,headers:h})}
 async function mobileHome(req,env){
  ready(env);
- if(new URL(req.url).searchParams.get("error"))return mPage("Não conectou",'<p>A autorização falhou ou foi cancelada. Confira se você está usando sua conta do Naruto Project RP.</p><a class="button" href="/mobile/start">Tentar novamente</a>');
+ const err=new URL(req.url).searchParams.get("error");
+ if(err){
+   const reasons={
+     state:"O navegador perdeu a sessão de login. Abra esta página no Chrome e conclua o Discord na mesma janela.",
+     denied:"A autorização foi cancelada ou recusada pelo Discord.",
+     discord_auth:"O Discord recusou a troca da autorização. Pode ser um Client Secret inválido ou uma autorização expirada; precisamos conferir a configuração segura.",
+     owner:"A conta do Discord autorizada não corresponde ao ID do proprietário cadastrado no Bushin.",
+     guild:"O Discord não confirmou essa conta como membro do Naruto Project RP.",
+     scope:"O Discord não concedeu todas as três permissões de identidade solicitadas.",
+     expired:"O tempo para autorizar expirou. Inicie uma nova tentativa.",
+     service:"O servidor encontrou uma falha temporária. Sua senha não foi exposta."
+   };
+   const hint=reasons[err]||"A autorização não pôde ser concluída. Não envie códigos ou tokens.";
+   return mPage("Login não concluído",'<p>'+mEsc(hint)+'</p><p class="muted">Diagnóstico: '+mEsc(Object.hasOwn(reasons,err)?err:"service")+'</p><a class="button" href="/mobile/start">Tentar novamente</a>');
+ }
  const raw=mCookie(req,M_SESSION);
  if(/^[A-Za-z0-9_-]{40,80}$/.test(raw)){
    const row=await q(env,"SELECT * FROM mobile_user_sessions WHERE token_hash=? AND expires_at>?",await digest(raw),now()).first();
@@ -349,14 +363,22 @@ async function mobileCallback(req,env){
  const b=ready(env),p=new URL(req.url).searchParams,state=p.get("state")||"";
  if(!/^mobile\.[A-Za-z0-9_-]{40,80}$/.test(state)||mCookie(req,M_FLOW)!==state)return mGo("/mobile?error=state");
  const row=await q(env,"DELETE FROM mobile_oauth_flows WHERE state_hash=? AND expires_at>? RETURNING *",await digest(state),now()).first();
- if(!row||!p.get("code")||p.get("error")||(p.get("iss")&&p.get("iss")!=="https://discord.com"))return mGo("/mobile?error=denied",[mSet(M_FLOW,"",0)]);
+ if(!row)return mGo("/mobile?error=expired",[mSet(M_FLOW,"",0)]);
+ if(!p.get("code")||p.get("error")||(p.get("iss")&&p.get("iss")!=="https://discord.com"))return mGo("/mobile?error=denied",[mSet(M_FLOW,"",0)]);
  try{
    const creds=await discordToken(env,{grant_type:"authorization_code",code:p.get("code"),redirect_uri:b+"/oauth/discord/callback",code_verifier:row.discord_verifier});
    const profile=await verified(env,creds),session=rnd()+rnd().slice(0,12),until=Math.min(now()+12*60*minute,creds.expires-30000);
    if(until<=now())throw Error("Expired login");
    await q(env,"INSERT INTO mobile_user_sessions (token_hash,user_id,creds_encrypted,expires_at) VALUES (?,?,?,?)",await digest(session),profile.id,await seal(creds,env),until).run();
    return mGo("/mobile",[mSet(M_FLOW,"",0),mSet(M_SESSION,session,Math.floor((until-now())/1000))]);
- }catch{return mGo("/mobile?error=denied",[mSet(M_FLOW,"",0)]);}
+ }catch(e){
+   const msg=String(e?.message||"");
+   const kind=msg.includes("not the Bushin owner")?"owner":
+     msg.includes("not in Naruto Project RP")?"guild":
+     e?.errorCode==="invalid_scope"?"scope":
+     msg.includes("Discord rejected the login")?"discord_auth":"service";
+   return mGo("/mobile?error="+kind,[mSet(M_FLOW,"",0)]);
+ }
 }
 async function mobileLogout(req,env){
  if(req.headers.get("origin")!==ready(env))return reply({error:"Invalid origin"},403);
