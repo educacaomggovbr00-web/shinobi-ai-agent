@@ -649,11 +649,54 @@ async function mobileDm(req,env){
    '<a class="button" href="/mobile/features">Voltar às ferramentas</a>');
 }
 async function mobilePersonalCommands(req,env){
- ready(env);
- const session=mCookie(req,M_SESSION);
- if(!/^[A-Za-z0-9_-]{40,80}$/.test(session))return mGo("/mobile");
- const row=await q(env,"SELECT * FROM mobile_user_sessions WHERE token_hash=? AND expires_at>?",await digest(session),now()).first();
- if(!row || row.user_id!==env.BUSHIN_OWNER_DISCORD_ID)return mGo("/mobile");
+ // Provide a precise, owner-only diagnostic BEFORE redirecting to an
+ // installation flow which may say "Unknown Application". This does not
+ // authorize new scopes or invalidate the existing mobile login.
+ const row=await mobileSessionOwner(req,env);
+ if(!row)return mGo("/mobile");
+ const portal="https://discord.com/developers/applications/"+DISCORD_CLIENT_ID+"/installation";
+ let status="Não foi possível verificar o aplicativo usando esta sessão OAuth.";
+ let appMatches=false;
+ try{
+   const credentials=await unseal(row.creds_encrypted,env);
+   if(credentials.expires>now()+30000){
+     const result=await fetch(DISCORD+"/oauth2/@me",{
+       headers:{authorization:"Bearer "+credentials.access,accept:"application/json"},
+       signal:AbortSignal.timeout(10000)
+     });
+     if(result.ok){
+       const info=await result.json();
+       const appId=String(info?.application?.id||"");
+       if(info?.user?.id===row.user_id&&/^\\d{15,22}$/.test(appId)){
+         appMatches=appId===DISCORD_CLIENT_ID;
+         status=appMatches?
+           "O Discord confirmou que seu login pertence ao aplicativo "+String(info.application.name||"Bushin").slice(0,70)+" (ID "+appId+").":
+           "ATENÇÃO: o OAuth conectado pertence ao aplicativo "+appId+", mas o link tenta usar "+DISCORD_CLIENT_ID+".";
+       }else{
+         status="O Discord não confirmou o ID do aplicativo associado a este login.";
+       }
+     }else if(result.status===401){
+       status="Sua autorização OAuth expirou; consulte a página principal antes de tentar novamente.";
+     }
+   }
+ }catch{}
+ const guide='<p>'+mEsc(status)+'</p>'+
+   '<p>O Discord mostrou <strong>Aplicativo desconhecido</strong>. Antes de tentar novamente, confira:</p>'+
+   '<ol style="line-height:1.75;padding-left:22px">'+
+   '<li>No Discord Developer Portal → <strong>General Information</strong>, confirme o <strong>Application ID '+mEsc(DISCORD_CLIENT_ID)+'</strong>.</li>'+
+   '<li>Em <strong>Installation → Installation Contexts</strong>, habilite <strong>User Install</strong>.</li>'+
+   '<li>Em <strong>Default Install Settings → User Install</strong>, adicione o escopo <code>applications.commands</code>, selecione <strong>Discord Provided Link</strong> em Install Link e salve.</li>'+
+   '</ol>'+
+   '<a class="button" href="'+mEsc(portal)+'">Abrir instalação do aplicativo no Discord</a>'+
+   (appMatches?'<a class="button" href="/mobile/commands/start">Já configurei: autorizar comandos</a>':
+     '<p class="muted">O botão de autorização fica disponível depois que o Discord confirmar que o Client ID é o mesmo do login.</p>')+
+   '<p class="muted">A instalação pessoal concede comandos do aplicativo, não leitura de canais ou envio de mensagens como sua conta. Não é necessário desconectar o login atual para configurar User Install.</p>'+
+   '<a class="button" href="/mobile">Voltar à conta conectada</a>';
+ return mPage("Configurar comandos pessoais",guide);
+}
+async function mobilePersonalCommandsStart(req,env){
+ const row=await mobileSessionOwner(req,env);
+ if(!row)return mGo("/mobile");
  return mGo(personalCommandsConsentUrl());
 }
 async function mobileStart(req,env){
@@ -726,6 +769,7 @@ export default {
       if(path==="/mobile/servers"&&req.method==="GET")return await mobileServers(req,env);
       if(path==="/mobile/dm"&&["GET","POST"].includes(req.method))return await mobileDm(req,env);
       if(path==="/mobile/commands"&&req.method==="GET")return await mobilePersonalCommands(req,env);
+      if(path==="/mobile/commands/start"&&req.method==="GET")return await mobilePersonalCommandsStart(req,env);
       if(path==="/mobile/start"&&req.method==="GET")return await mobileStart(req,env);
       if(path==="/mobile/logout"&&req.method==="POST")return await mobileLogout(req,env);
       if(path==="/oauth/discord/callback"&&req.method==="GET"&&new URL(req.url).searchParams.get("state")?.startsWith("mobile."))return await mobileCallback(req,env);
