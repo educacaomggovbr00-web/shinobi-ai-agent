@@ -13,9 +13,16 @@ async function get(api,path,token){
  if(!res.ok)throw Error("Discord não forneceu estes dados (HTTP "+res.status+").");
  return res.json();
 }
-function allowed(env,recipient){
+export function officialBotDmReady(env){
+ return typeof env.DISCORD_BOT_TOKEN==="string"&&env.DISCORD_BOT_TOKEN.length>30;
+}
+function allowed(env,recipient,owner){
+ if(!officialBotDmReady(env)||!id(recipient))return false;
+ // A DM to the current verified OAuth owner is explicitly eligible without
+ // requiring the bot's unrelated guild channel configuration.
+ if(recipient===owner)return true;
  const list=String(env.BUSHIN_BOT_DM_USER_IDS||"").split(",").map(s=>s.trim()).filter(Boolean);
- return botReady(env)&&list.length>0&&list.length<=10&&list.every(id)&&id(recipient)&&list.includes(recipient);
+ return list.length>0&&list.length<=10&&list.every(id)&&list.includes(recipient);
 }
 async function dmRequest(env,recipient,content=null){
  const open=await fetch(API+"/users/@me/channels",{
@@ -65,8 +72,16 @@ export async function discordCall(env,name,args={},ctx={}){
    if(!botReady(env))return blocked(name,"Envio via API requer bot oficialmente autorizado no canal. Não é envio pela sua conta pessoal.");
    return {state:"completed",...(await botCall(env,"bushin_bot_send_message",{channel_id:args.channel_id,content:args.content,confirmed:args.confirmed}))};
  }
+ if(name==="discord_dm_status")return {
+   state:"completed",bot_token_configured:officialBotDmReady(env),
+   recipient_policy:"o proprietário verificado é permitido; outras pessoas exigem lista explícita",
+   requires_guild_admin:false,
+   delivery_guaranteed:false,
+   note:"O Discord pode bloquear DMs de bots mesmo com token válido. Nenhuma mensagem é enviada por esta consulta."
+ };
  if(name==="discord_create_dm"||name==="discord_send_dm"){
-   if(!allowed(env,args.recipient_id))return blocked(name,"DMS só por bot oficial configurado com lista explícita de destinatários autorizados.");
+   if(!allowed(env,args.recipient_id,me.id))return blocked(name,
+     officialBotDmReady(env)?"Destinatário não autorizado: use sua conta verificada ou inclua o ID na lista do bot.":"Falta DISCORD_BOT_TOKEN no Worker. Envio de DM como bot não depende da lista de canais da guild.");
    if(args.confirmed!==true)throw Error("Confirme o destinatário antes de criar ou enviar DM.");
    if(name==="discord_create_dm")return dmRequest(env,args.recipient_id);
    if(typeof args.content!=="string"||!args.content.trim()||args.content.length>900)throw Error("DM deve ter entre 1 e 900 caracteres.");
