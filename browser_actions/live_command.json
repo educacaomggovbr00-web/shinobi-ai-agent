@@ -1,5 +1,7 @@
 {
-  "id": "bushin-gallery-controls-39188253738-15",
+  "id": "bushin-gallery-guides-click-39188253738-16",
   "session_id": "39188253738",
-  "action": "inspect_ui"
+  "action": "click",
+  "x": 223,
+  "y": 487
 }
