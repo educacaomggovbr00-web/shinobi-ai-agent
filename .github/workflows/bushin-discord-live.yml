@@ -41,6 +41,8 @@ jobs:
           python -m pip install 'aiohttp==3.11.18' 'playwright==1.56.0'
           python -m playwright install chromium --with-deps
           npm install --prefix browser_actions --no-save --no-package-lock --ignore-scripts --no-audit --no-fund '@actions/artifact@2.3.2'
+          # Gateway tests run after aiohttp is installed (the early lint phase skips them).
+          python -m unittest discover -s browser_actions -p 'test_*.py' -v
 
       - name: "Exportar configuracao autenticada do servico de artifacts"
         uses: actions/github-script@v7
