@@ -1,14 +1,11 @@
 {
-  "id": "bushin-gallery-chat-39188253738-24",
+  "id": "bushin-back-chamar-39188253738-25",
   "session_id": "39188253738",
-  "action": "screenshot",
+  "action": "open_url",
   "ok": true,
   "data": {
-    "artifact_id": 12161221244,
-    "artifact_name": "bushin-snapshot-39188253738-af26e2eb957741",
-    "retention_days": 1,
-    "visible_page": "https://discord.com/channels/1515877468299595919/1520114256740352061",
-    "note": "Private Actions artifact only; request its download to show the JPEG in ChatGPT."
+    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
+    "title": "Discord"
   },
-  "finished_at_utc": "2026-10-19T03:11:41.752622+00:00"
+  "finished_at_utc": "2026-10-19T03:21:32.765993+00:00"
 }
