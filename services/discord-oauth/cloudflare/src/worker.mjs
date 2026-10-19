@@ -497,7 +497,14 @@ async function mobileWorkspace(req,env){
  const owner=row.user_id,context={me:{id:owner}};
  let notice="";
  if(req.method==="POST"){
-   if(req.headers.get("origin")!==ready(env))return reply({error:"Wrong form origin"},403);
+   // Android form POSTs can omit Origin. Accept an exact same-origin Referer
+   // only when Origin is absent (never when Origin is mismatched).
+   const expected=ready(env),origin=req.headers.get("origin"),referer=req.headers.get("referer");
+   let sameSite=origin===expected;
+   if(!origin&&referer){
+     try{sameSite=new URL(referer).origin===expected}catch{}
+   }
+   if(!sameSite)return reply({error:"Wrong form origin"},403);
    if(!(req.headers.get("content-type")||"").startsWith("application/x-www-form-urlencoded"))
      return reply({error:"Expected form"},415);
    const raw=await req.text();
