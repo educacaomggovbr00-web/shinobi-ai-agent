@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from aiohttp import web, ClientSession, ClientTimeout, WSMsgType
 
@@ -60,6 +60,8 @@ def safe_equal(left, right):
 def make_app(secret):
     app = web.Application(client_max_size=1024 * 1024)
     app["secret"] = secret
+    # Mutable holder: populated once Cloudflare provides the real public HTTPS origin.
+    app["public_origin"] = {"url": None}
 
     def authenticated_redirect():
         response = web.HTTPFound("/vnc.html?autoconnect=1&resize=scale")
@@ -79,7 +81,10 @@ def make_app(secret):
 
         if request.path == "/login" and request.method == "POST":
             # Origin prevents another website from silently submitting a login.
-            if request.headers.get("Origin") != "https://" + request.host:
+            # The tunnel may forward a local Host header, so validate against
+            # the exact HTTPS origin Cloudflare assigned instead of request.host.
+            expected_origin = app["public_origin"]["url"] or "https://" + request.host
+            if request.headers.get("Origin") != expected_origin:
                 return web.Response(status=403, text="Origem nao autorizada", headers=LOGIN_HEADERS)
             form = await request.post()
             if not safe_equal(form.get("access_key", ""), secret):
@@ -220,6 +225,8 @@ async def start():
         except asyncio.TimeoutError:
             raise RuntimeError("Cloudflare nao retornou endereco HTTPS em 100 segundos")
 
+        # Set the single allowed Origin before accepting form submissions.
+        gateway.app["public_origin"]["url"] = base_url.rstrip("/")
         # Public hostname only: never publish the private /connect key.
         Path("/tmp/bushin-public-origin").write_text(base_url.rstrip("/") + "/vnc.html?autoconnect=1&resize=scale", encoding="utf-8")
         user_url = base_url.rstrip("/") + "/connect?key=" + quote(secret)
