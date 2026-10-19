@@ -156,6 +156,7 @@ test("Signed GitHub Actions OIDC safely registers runner, exchanges one private 
  const ownerHtml=await view.text();
  assert.match(ownerHtml,/Navegador temporário conectado/);
  assert.match(ownerHtml,/Assumir navegador visual/);
+ assert.match(ownerHtml,/Rolar para baixo/);
  const takeoverRedirect=await visualTakeover(new Request(origin+"/mobile/visual/takeover"),env,
    {ownerId:owner,unseal,redirect});
  assert.equal(takeoverRedirect.status,303);
@@ -179,4 +180,20 @@ test("Signed GitHub Actions OIDC safely registers runner, exchanges one private 
  view=await visualMobile(new Request(origin+"/mobile/visual"),env,mobile);
  assert.match(await view.text(),/completed/);
  assert.equal((await (await visualRunner(req("/bridge/runner/poll?run_id="+runId),env)).json()).command,null);
+ const refererOnly=await visualMobile(new Request(origin+"/mobile/visual",{
+   method:"POST",headers:{"content-type":"application/x-www-form-urlencoded","referer":origin+"/mobile/visual"},
+   body:new URLSearchParams({action:"scroll",direction:"down",amount:"3"})
+ }),env,mobile);
+ assert.equal(refererOnly.status,303,"Android should be able to submit same-origin Referer-only actions");
+ const queuedAgain=(await (await visualRunner(req("/bridge/runner/poll?run_id="+runId),env)).json()).command;
+ assert.equal(queuedAgain.action,"scroll");
+ assert.equal(queuedAgain.direction,"down");
+ const invalidOrigins=[{"referer":"https://evil.example/mobile/visual"},{"origin":"https://evil.example","referer":origin+"/mobile/visual"},{}];
+ for(const headers of invalidOrigins){
+   const denied=await visualMobile(new Request(origin+"/mobile/visual",{
+     method:"POST",headers:{"content-type":"application/x-www-form-urlencoded",...headers},
+     body:new URLSearchParams({action:"status"})
+   }),env,mobile);
+   assert.equal(denied.status,403,"Cross-site and unverified mobile posts remain blocked");
+ }
 });
