@@ -1,0 +1,51 @@
+name: "🍥 Bushin — teste de captura no chat"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  imagem:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: "Validar scripts da nova integracao"
+        run: |
+          python -m py_compile browser_actions/live_controller.py browser_actions/live_desktop.py
+          node --check browser_actions/snapshot_upload.cjs
+          python -m unittest discover -s browser_actions -p test_live_controller.py -v
+
+      - name: "Preparar upload privado de imagem"
+        run: |
+          npm install --prefix browser_actions --no-save --no-package-lock --ignore-scripts --no-audit --no-fund '@actions/artifact@2.3.2'
+          python -m pip install 'pillow==11.3.0'
+          mkdir -p /tmp/bushin-snapshots
+          chmod 700 /tmp/bushin-snapshots
+          python - <<'PY'
+          from PIL import Image, ImageDraw
+          im = Image.new("RGB", (640, 360), "#202635")
+          d = ImageDraw.Draw(im)
+          d.text((70, 110), "BUSHIN - CAPTURA DE TESTE", fill="white")
+          d.text((70, 165), "Sem Discord, senhas ou dados privados", fill="#a8c6d8")
+          d.text((70, 220), "GitHub Actions => imagem no ChatGPT", fill="#b5e8b5")
+          im.save("/tmp/bushin-snapshots/test.jpg", format="JPEG", quality=85)
+          PY
+
+      - name: "Enviar imagem para artifact privado enquanto o job esta em execucao"
+        env:
+          IMAGE_NAME: "bushin-snapshot-${{ github.run_id }}-smoketest"
+        run: |
+          node browser_actions/snapshot_upload.cjs /tmp/bushin-snapshots/test.jpg "$IMAGE_NAME"
+          rm -f /tmp/bushin-snapshots/test.jpg
+          echo "Captura de teste enviada. O job segue online por 40 segundos."
+          sleep 40
