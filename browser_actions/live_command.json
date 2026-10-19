@@ -1,5 +1,5 @@
 {
-  "id": "bushin-ping-39188253738-12",
+  "id": "bushin-mission-read-39188253738-13",
   "session_id": "39188253738",
-  "action": "status"
+  "action": "read_page_text"
 }
