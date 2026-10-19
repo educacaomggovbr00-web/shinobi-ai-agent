@@ -57,6 +57,20 @@ def validate_gallery_urls(urls):
         normalized.append(url)
     return normalized
 
+def validate_scout_urls(urls):
+    """Scan one to four distinct channel IDs inside the authorized RP server."""
+    if not isinstance(urls, list) or not 1 <= len(urls) <= 4:
+        raise ValueError("RPG scout requires 1-4 authorized Naruto RP channels")
+    checked = []
+    for url in urls:
+        validate_url(url)
+        if not re.fullmatch(r"/channels/" + re.escape(GUILD_ID) + r"/[0-9]{15,22}", urlsplit(url).path):
+            raise ValueError("RPG scout accepts only Naruto Project RP text channels")
+        if url in checked:
+            raise ValueError("Duplicate RPG scout channel")
+        checked.append(url)
+    return checked
+
 def validate_command(command, run_id):
     if not isinstance(command, dict):
         raise ValueError("Command must be a JSON object")
@@ -66,12 +80,14 @@ def validate_command(command, run_id):
     if not isinstance(ident, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", ident):
         raise ValueError("Invalid command id")
     action = command.get("action")
-    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery"):
-        raise ValueError("Unsupported action: use status, open_url, read_page_text, scroll, click_navigation or screenshot")
+    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery", "rpg_scout", "rpg_view"):
+        raise ValueError("Unsupported action: use status, RPG scout/view, gallery, and authorized navigation/reading")
     if action == "open_url":
         validate_url(command.get("url"))
     if action == "capture_gallery":
         validate_gallery_urls(command.get("urls"))
+    if action == "rpg_scout":
+        validate_scout_urls(command.get("urls"))
     if action == "scroll":
         if command.get("direction", "down") not in ("up", "down"):
             raise ValueError("Invalid scroll direction")
@@ -242,6 +258,65 @@ async def safe_type_search(page, value):
     await box.fill(value, timeout=6500)
     return {"search_filled": True, "characters": len(value), "url": redacted_page_url(page.url)}
 
+
+async def extract_rpg_view(page):
+    """Read only rendered posts/messages inside the current authorized guild channel."""
+    assert_rp_channel(page.url)
+    if await page.locator('input[type="password"]').count():
+        raise ValueError("RPG view denied while login/password form is present")
+    # Restrict extraction to Discord channel messages and forum topics, avoiding
+    # the sidebar (which can expose other guild names, DMs, and notifications).
+    data = await page.evaluate(r"""() => {
+      const clean = (value, max=400) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+      const seen = new Set();
+      const rows = [...document.querySelectorAll('li[id^="chat-messages-"]')];
+      const messages = rows.slice(-30).map(row => {
+        const username = row.querySelector('[id^="message-username-"], h3 [class*="username"], h3');
+        const contentNodes = [...row.querySelectorAll('[id^="message-content-"]')];
+        const body = contentNodes.length
+            ? contentNodes.map(el => clean(el.innerText, 420)).filter(Boolean).join(' ')
+            : '';
+        const timestamp = row.querySelector('time')?.getAttribute('datetime') || '';
+        return {author: clean(username?.innerText, 90), text: clean(body, 420),
+                timestamp: clean(timestamp, 45)};
+      }).filter(row => row.text).slice(-10);
+      const forumRoots = [...document.querySelectorAll(
+        'main [role="link"], main a[href*="/channels/"], [class*="forum"] [role="link"]')];
+      const topics = [];
+      if (messages.length === 0) for (const node of forumRoots) {
+        const title = clean(node.getAttribute('aria-label') || node.innerText, 150);
+        if (title && !seen.has(title)) { seen.add(title); topics.push(title); }
+        if (topics.length >= 12) break;
+      }
+      const main = document.querySelector('main, [role="main"]');
+      const label = clean(main?.getAttribute('aria-label') || document.title, 160);
+      return {label, messages, topics, rendered_only: true};
+    }""")
+    return {"url": redacted_page_url(page.url), **data}
+
+async def scout_rpg_channels(page, urls):
+    """Read a few requested channels and restore the user's original view."""
+    assert_rp_channel(page.url)
+    checked = validate_scout_urls(urls)
+    original = page.url
+    readings = []
+    try:
+        for destination in checked:
+            await page.goto(destination, wait_until="domcontentloaded", timeout=22000)
+            await page.wait_for_timeout(650)
+            if urlsplit(page.url).path != urlsplit(destination).path:
+                raise ValueError("Discord did not load the requested RP channel (login or redirect)")
+            readings.append(await extract_rpg_view(page))
+    finally:
+        if (urlsplit(original).hostname in ("discord.com", "www.discord.com")
+                and urlsplit(original).path.startswith("/channels/" + GUILD_ID + "/")):
+            try:
+                await page.goto(original, wait_until="domcontentloaded", timeout=18000)
+            except Exception:
+                pass
+    return {"checked": len(readings), "channels": readings, "restored_to": redacted_page_url(original),
+            "note": "Only rendered RP channel message bodies/forum topics; private GitHub result history. No posting."}
+
 async def perform(action, command):
     from playwright.async_api import async_playwright
     async with async_playwright() as pw:
@@ -249,6 +324,10 @@ async def perform(action, command):
         try:
             page = await get_page(browser)
             current_url = redacted_page_url(page.url)
+            if action == "rpg_view":
+                return await extract_rpg_view(page)
+            if action == "rpg_scout":
+                return await scout_rpg_channels(page, command["urls"])
             if action == "inspect_ui":
                 return {"controls": await visible_ui_controls(page), "url": redacted_page_url(page.url)}
             if action == "click":
