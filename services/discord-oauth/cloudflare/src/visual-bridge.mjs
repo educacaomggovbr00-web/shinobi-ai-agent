@@ -5,6 +5,7 @@
  */
 const REPO="educacaomggovbr00-web/shinobi-ai-agent";
 const REF=REPO+"/.github/workflows/bushin-discord-live.yml@refs/heads/main";
+const SMOKE_REF=REPO+"/.github/workflows/bushin-oidc-bridge-smoke.yml@refs/heads/main";
 const ISS="https://token.actions.githubusercontent.com";
 const AUD="bushin-cloudflare-visual-v1";
 const GUILD="1515877468299595919";
@@ -36,12 +37,12 @@ async function jwks(){
  jwksMemo={keys:v.keys,expires:millis()+15*60000};
  return v.keys;
 }
-export async function verifyGitHubOidc(jwt){
+export async function verifyGitHubOidc(jwt,{allowSmoke=false}={}){
  const v=stripJwt(jwt);
  if(!v||v.head?.alg!=="RS256"||typeof v.head?.kid!=="string")return null;
  const c=v.payload,t=Math.floor(millis()/1000);
  if(c.iss!==ISS||c.aud!==AUD||c.repository!==REPO||c.ref!=="refs/heads/main"||
-    c.workflow_ref!==REF||c.sub!=="repo:"+REPO+":ref:refs/heads/main"||
+    !(c.workflow_ref===REF||(allowSmoke&&c.workflow_ref===SMOKE_REF))||c.sub!=="repo:"+REPO+":ref:refs/heads/main"||
     !["workflow_dispatch","push"].includes(c.event_name)||c.runner_environment!=="github-hosted"||
     !/^[0-9]{8,20}$/.test(String(c.run_id||""))||
     !Number.isInteger(c.exp)||c.exp<=t||c.exp>t+600||
@@ -124,10 +125,11 @@ export async function visualRunner(req,env){
    if(req.method!=="POST")return fail("Method not allowed",405);
    const head=req.headers.get("authorization")||"";
    const jwt=head.startsWith("Bearer ")?head.slice(7):"";
-   let validated;try{validated=await verifyGitHubOidc(jwt)}catch{return fail("OIDC verification rejected",403);}
+   const dryRun=new URL(req.url).searchParams.get("dry_run")==="1";
+   let validated;try{validated=await verifyGitHubOidc(jwt,{allowSmoke:dryRun})}catch{return fail("OIDC verification rejected",403);}
    if(!validated)return fail("Unauthorized runner identity",403);
    // Verification-only test: no runner secret or database session is created.
-   if(new URL(req.url).searchParams.get("dry_run")==="1")return json({verified:true,run_id:validated.runId});
+   if(dryRun)return json({verified:true,run_id:validated.runId});
    // Short-lived and one-use OIDC jti prevents replay of a GH id token.
    const before=await query(env,"SELECT jti_hash FROM bushin_visual_jti WHERE jti_hash=?",await digest(validated.jti)).first();
    if(before)return fail("OIDC replay rejected",409);
