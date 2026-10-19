@@ -76,7 +76,7 @@ class FakeD1 {
   return {bind(...p){
    return {
     async first(){
-     if(sql.startsWith("SELECT * FROM bushin_tasks"))return db.tasks.get(p[0])||null;
+     if(sql.startsWith("SELECT * FROM bushin_tasks")){const task=db.tasks.get(p[0]);return task?.owner_id===p[1]?task:null;}
      if(sql.startsWith("SELECT key,value_json"))return db.mem.get(p[0]+"|"+p[1])||null;
      return null;
     },
