@@ -122,3 +122,27 @@ test("Only an authenticated mobile session can start the personal command instal
  assert.equal(u.searchParams.get("integration_type"),"1");
  assert.equal(consent.headers.get("set-cookie"),null);
 });
+
+test("Opening the MCP endpoint in Android/browser explains the API instead of returning Not Found",async()=>{
+ const base="https://bushin-owner.workers.dev";
+ const env={PUBLIC_BASE_URL:base};
+ for(const url of [base+"/mcp",base+"/mcp?utm_source=chatgpt.com"]){
+   const response=await worker.fetch(new Request(url,{headers:{accept:"text/html,application/xhtml+xml"}}),env);
+   assert.equal(response.status,200,url);
+   assert.match(response.headers.get("content-type")||"",/text\/html/);
+   assert.equal(response.headers.get("cache-control"),"no-store");
+   const html=await response.text();
+   assert.match(html,/API para clientes MCP/);
+   assert.match(html,/plugin Bushin precisa estar instalado/);
+   assert.match(html,/href="\/mobile"/);
+   assert.equal(html.includes("Not found"),false);
+ }
+});
+test("Machine GET on MCP returns 405 and POST remains the advertised RPC method",async()=>{
+ const base="https://bushin-owner.workers.dev";
+ const env={PUBLIC_BASE_URL:base};
+ const response=await worker.fetch(new Request(base+"/mcp",{headers:{accept:"text/event-stream"}}),env);
+ assert.equal(response.status,405);
+ assert.equal(response.headers.get("allow"),"POST");
+ assert.deepEqual((await response.json()).error,"MCP requires POST");
+});
