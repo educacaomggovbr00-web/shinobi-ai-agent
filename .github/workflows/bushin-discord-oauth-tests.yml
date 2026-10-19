@@ -1,4 +1,4 @@
-name: "🍥 Bushin — Discord OAuth próprio (testes)"
+name: "🍥 Bushin — Discord e painel visual MCP (testes)"
 on:
   workflow_dispatch:
   push:
@@ -18,12 +18,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: "Validar JavaScript do servidor e cliente Discord"
+      - name: "Instalar dependencias oficiais MCP Apps (sem segredos)"
+        working-directory: services/discord-oauth
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: "Verificar sintaxe do painel Bushin"
         run: |
           node --check services/discord-oauth/src/server.mjs
           node --check services/discord-oauth/src/discord-api.mjs
-      - name: "Testar OAuth: privacidade, escopos e autorização"
+          node --check services/discord-oauth/src/github-bridge.mjs
+      - name: "Testar limites, OAuth e controles de navegador"
         run: node --test services/discord-oauth/tests/*.test.mjs
-      - name: "Instalar SDK MCP para verificar dependências"
-        working-directory: services/discord-oauth
-        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: "Confirmar UI e scopes autorizados"
+        run: |
+          grep -q 'registerAppResource' services/discord-oauth/src/server.mjs
+          grep -q 'bushin_browser_screenshot' services/discord-oauth/src/server.mjs
+          grep -q 'Clicar na imagem' services/discord-oauth/public/browser-console.html
+          ! grep -q 'send_message' services/discord-oauth/src/server.mjs
