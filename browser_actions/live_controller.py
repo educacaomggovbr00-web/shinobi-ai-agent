@@ -96,9 +96,9 @@ def validate_command(command, run_id):
         value = command.get("text")
         if not isinstance(value, str) or not 1 <= len(value) <= 500 or value != value.strip():
             raise ValueError("Message must be 1-500 characters without outer whitespace")
-        if any(c in value for c in ("\\n", "\\r", "\\x00")):
+        if any(c in value for c in ("\n", "\r", "\x00")):
             raise ValueError("Message must be a single line")
-        if re.search(r"@(everyone|here)\\b", value, re.I):
+        if re.search(r"@(everyone|here)\b", value, re.I):
             raise ValueError("Mass mentions are not supported")
         if action == "send_command" and not re.fullmatch(r"[!/.][a-zA-Z0-9_-]{1,40}(?: [a-zA-Z0-9_ -]{1,120})?", value):
             raise ValueError("Commands need a valid bot prefix and short arguments")
