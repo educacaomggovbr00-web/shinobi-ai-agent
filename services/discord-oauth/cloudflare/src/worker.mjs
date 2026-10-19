@@ -11,6 +11,7 @@
 import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
+import {logToolAction} from "./state-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
 const SCOPES=["identify","guilds","guilds.members.read"];
@@ -364,8 +365,13 @@ async function mcp(req,env){
         name==="bushin_discord_whoami"?
         {id:me.id,username:me.username,display_name:me.display_name,verified_account:true}:
         {username:me.username,...me.membership};
+      if(ADVANCED_NAMES.has(name)&&name!=="bushin_audit_log")
+        await logToolAction(env,{me},name,data?.state||"completed").catch(()=>{});
       return rpc(id,{content:[{type:"text",text:JSON.stringify(data)}],structuredContent:data});
-    }catch(e){return rpc(id,{isError:true,content:[{type:"text",text:e.message||"Discord check failed"}]});}
+    }catch(e){
+      if(ADVANCED_NAMES.has(name))await logToolAction(env,{me},name,"failed").catch(()=>{});
+      return rpc(id,{isError:true,content:[{type:"text",text:e.message||"Discord check failed"}]});
+    }
   }
   return rpcError(id,-32601,"Method not found");
 }
