@@ -125,7 +125,7 @@ export function validateMobileAction(form){
  }
  return {action,args};
 }
-export async function visualRunner(req,env){
+export async function visualRunner(req,env,{seal=null}={}){
  const path=new URL(req.url).pathname;
  if(path==="/bridge/runner/register"){
    if(req.method!=="POST")return fail("Method not allowed",405);
@@ -148,6 +148,18 @@ export async function visualRunner(req,env){
  if(!["GET","POST"].includes(req.method))return fail("Method not allowed",405);
  const row=await readRunner(req,env);
  if(!row)return fail("Runner authentication required",401);
+ if(path==="/bridge/runner/takeover"&&req.method==="POST"){
+   if(typeof seal!=="function")return fail("Takeover encryption unavailable",503);
+   if(Number(req.headers.get("content-length")||0)>1200)return fail("Payload too large",413);
+   const body=await req.text();if(body.length>1200)return fail("Payload too large",413);
+   let url="";
+   try{url=JSON.parse(body).url}catch{return fail("Malformed takeover request")}
+   if(typeof url!=="string"||!/^https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com\/connect\?key=[A-Za-z0-9_-]{35,90}$/.test(url))
+     return fail("Invalid secure takeover link");
+   await query(env,"UPDATE bushin_visual_sessions SET takeover_encrypted=? WHERE run_id=? AND owner_id=?",
+     await seal(url),row.run_id,row.owner_id).run();
+   return json({secured:true});
+ }
  if(path==="/bridge/runner/poll"&&req.method==="GET"){
    await query(env,"UPDATE bushin_visual_sessions SET last_seen=? WHERE run_id=?",millis(),row.run_id).run();
    const command=await query(env,"SELECT * FROM bushin_visual_commands WHERE run_id=? AND owner_id=? AND state='queued' ORDER BY created_at ASC LIMIT 1",
@@ -174,7 +186,7 @@ export async function visualRunner(req,env){
 }
 export async function visualMobile(req,env,{ownerId,escape,page,redirect,base}){
  const clock=millis();
- const rows=await query(env,"SELECT run_id,expires_at,last_seen FROM bushin_visual_sessions WHERE owner_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 1",
+ const rows=await query(env,"SELECT run_id,expires_at,last_seen,takeover_encrypted FROM bushin_visual_sessions WHERE owner_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 1",
    ownerId,clock).all();
  const runner=rows.results?.[0]||null;
  const online=runner&&runner.last_seen>clock-60000;
@@ -214,9 +226,24 @@ export async function visualMobile(req,env,{ownerId,escape,page,redirect,base}){
  '<h2>Enviar com confirmação</h2><form method="post" action="/mobile/visual"><input type="hidden" name="action" value="send_message"><label>URL exata do canal</label><input name="url" style="width:100%;padding:12px" required><label>Texto a enviar</label><textarea name="text" maxlength="500" style="width:100%;min-height:100px" required></textarea><label><input type="checkbox" name="confirmed" value="yes" required> Confirmo o envio no canal escolhido</label><button class="button">Enviar mensagem</button></form>';
  const hint=online?'<p class="ok">✓ Navegador temporário conectado à Cloudflare. Isso não confirma login no Discord.</p>':
    '<p>Não há navegador ativo. <a href="https://github.com/'+REPO+'/actions/workflows/bushin-discord-live.yml">Iniciar uma sessão pelo GitHub Actions</a> e faça login na janela segura. O OAuth móvel não transfere sua sessão ao Chromium.</p>';
+ const takeover=online&&runner.takeover_encrypted?
+   '<a class="button" href="/mobile/visual/takeover">Assumir navegador visual (acesso protegido)</a>':"";
  const html=(message?'<p>'+escape(message)+'</p>':"")+hint+
-   '<h2>Comandos rápidos</h2>'+actions+form+
+   takeover+'<h2>Comandos rápidos</h2>'+actions+form+
    '<h2>Resultados recentes</h2>'+(recent.results||[]).map(renderResult).join("")+
    '<a class="button" href="/mobile/visual">Atualizar resultados</a><a class="button" href="/mobile">Voltar ao Bushin</a>';
  return page("Controle visual do Bushin",html);
+}
+
+export async function visualTakeover(req,env,{ownerId,unseal,redirect}){
+ if(typeof unseal!=="function")return redirect("/mobile/visual");
+ const clock=millis();
+ const row=await query(env,"SELECT takeover_encrypted FROM bushin_visual_sessions WHERE owner_id=? AND expires_at>? AND last_seen>? AND takeover_encrypted IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+   ownerId,clock,clock-60000).first();
+ if(!row?.takeover_encrypted)return redirect("/mobile/visual");
+ let url="";
+ try{url=await unseal(row.takeover_encrypted)}catch{return redirect("/mobile/visual")}
+ if(typeof url!=="string"||!/^https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com\/connect\?key=[A-Za-z0-9_-]{35,90}$/.test(url))
+   return redirect("/mobile/visual");
+ return redirect(url);
 }
