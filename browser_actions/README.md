@@ -49,3 +49,21 @@ Com a versão do código instalada em **novas execuções** após a integração
 O controle funciona por meio do GitHub integrado ao ChatGPT, **sem requerer o segredo do noVNC**. Quem possui o link privado continua podendo acompanhar e controlar o mouse/teclado manualmente. Não compartilhe esse link.
 
 **Execuções antigas não são atualizadas:** a execução #39176481835 começou antes do código com receptor GitHub; se ainda estiver ativa, preserva a tela mas **não** recebe novos comandos. Não a reinicie sem autorização, pois o login atual será perdido. Na próxima execução do workflow atualizado, é possível fazer login novamente e testar os comandos. O plugin [Bushin Browser v1.2](https://chatgpt.com/plugins/plugins_6ad54d1a617c819191f5c10570c66ef3) descreve esses passos.
+
+
+## 📸 Bushin v1.4 — capturas reais NO chat, sem iframe
+
+O ChatGPT bloqueou a incorporação do noVNC por Content Security Policy (`ERR_BLOCKED_BY_CSP`). **Não é possível converter a janela do GitHub Actions na interface nativa do Work só editando o plugin.**
+
+A alternativa testada com sucesso é uma **captura estática sob demanda** em um artifact privado do próprio GitHub Actions, recuperado pelo assistente e exibido como imagem no ChatGPT. O teste sintético executou em https://github.com/educacaomggovbr00-web/shinobi-ai-agent/actions/runs/39181978194 e produziu uma imagem enquanto o job ainda estava em andamento. **Esse teste não capturou o Discord.**
+
+Como funciona em **sessões novas** do Linux (as execuções já iniciadas não carregam novos scripts):
+
+1. Inicie `bushin-discord-live.yml` quando não precisar mais preservar a sessão antiga; faça login pelo noVNC seguro na execução nova. **Não coloque senhas, cookies, tokens ou segredo do noVNC no repositório ou chat.**
+2. Abra um canal do servidor autorizado Naruto Project RP.
+3. Peça ao Bushin no ChatGPT: *"Tira um print da tela do Naruto RP e mostra aqui."*
+4. O assistente verifica o `run_id` online, insere na fila `browser_actions/live_command.json` uma solicitação `{"id":"...","session_id":"...","action":"screenshot"}`, e aguarda no `browser_actions/live_result.json` um `artifact_id` confirmado.
+5. A captura JPEG é enviada como **artifact privado** com retenção de 1 dia, sem colocar os pixels em commits, logs ou no plugin; no GitHub permanece somente o ID e nome do artifact. O assistente baixa pelo conector GitHub, verifica o arquivo e exibe a imagem local no chat. Para atualizar a imagem é necessário outro pedido; **não é transmissão ao vivo contínua**.
+6. Restrição: somente canais de Naruto Project RP, sem campos de senha, limite de 6 capturas por execução. Cada captura é guardada temporariamente no armazenamento de artifacts privado e pode ser acessada por pessoas com acesso ao repositório durante o período de retenção.
+
+O link noVNC continua externo e pode ser usado em paralelo pelo usuário para vídeo realmente ao vivo. O teste bem-sucedido não confirma ainda uma captura de Discord: depende de iniciar uma nova sessão com o código atualizado. **A execução #39178166963 foi iniciada antes do novo código e não oferece o comando screenshot.**
