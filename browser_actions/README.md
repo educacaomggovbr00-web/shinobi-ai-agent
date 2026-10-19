@@ -79,3 +79,27 @@ Nas **novas execuções** do workflow de desktop, a raiz do túnel Cloudflare e 
 - A execução continua efêmera (até 6h incluindo provisionamento); novas versões **não** são aplicadas retroativamente em sessões já iniciadas.
 
 **Importante:** essa mudança não torna o desktop público ou acessível diretamente ao TinyFish/Browser Use sem autenticação. Esses serviços precisariam de uma sessão web autenticada própria, configurada pela interface segura deles. Não publique o link privado ou a chave na conversa.
+
+
+## 📷 Bushin v1.6 — galeria de capturas do RPG (somente NOVAS execuções)
+
+O comando autenticado `capture_gallery` gera **2 a 4 capturas reais**, sem criar imagens simuladas, e devolve IDs de artifacts privados para serem baixados e exibidos como galeria no ChatGPT. Ele não é streaming ao vivo e não depende de uma URL secreta no prompt.
+
+Formato da fila privada `browser_actions/live_command.json`:
+
+```json
+{
+  "id": "galeria-naruto-001",
+  "session_id": "ID_DA_EXECUCAO_ATIVA",
+  "action": "capture_gallery",
+  "urls": [
+    "https://discord.com/channels/1515877468299595919/1520116350360617154",
+    "https://discord.com/channels/1515877468299595919/1544461080624111716",
+    "https://discord.com/channels/1515877468299595919/1520114256740352061"
+  ]
+}
+```
+
+A resposta confirmada em `live_result.json` contém `data.captures[]`, cada qual com `artifact_id`, `artifact_name`, `visible_page` e retenção de 1 dia. O assistente deve verificar e baixar **cada ZIP privado**, validar os JPEGs, fornecer links individuais e, quando útil, montar uma imagem-colagem para visualização no celular. Sem inventar URLs de arquivos nem afirmar que os pixels foram exibidos antes de verificá-los. A galeria devolve o Chrome ao canal original ao terminar, mesmo se um dos downloads falhar.
+
+Segurança: máximo de **4 capturas por pedido** e **12 por sessão** (contando `screenshot` e `capture_gallery`). URLs aceitas somente de canais com ID numérico do servidor Naruto Project RP. O código rejeita DMs, formulários de senha e páginas fora do servidor; nenhuma postagem, clique em envio ou comando de terminal foi acrescentado. Os artifacts continuam privados e expiram em 1 dia. **Sessões já iniciadas continuam no código anterior** e só suportam pedidos de capturas individuais sob o teto antigo de 6 imagens.
