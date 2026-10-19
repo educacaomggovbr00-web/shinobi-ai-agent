@@ -40,6 +40,16 @@ function available(env){return {
  files_private_workspace:"requires_github_bridge",
  rpg_state:"d1",background_agent:false
 };}
+export async function logToolAction(env,ctx,tool,state="completed"){
+  // Only a tool identifier + fixed status are retained; never log message
+  // text, OAuth data, filenames, recipients or screenshot content.
+  if(typeof tool!=="string"||!/^[a-z_]{5,90}$/.test(tool))return;
+  const owner=user(ctx);
+  const summary=["completed","failed","unavailable","queued","requested","planned",
+    "paused","cancelled","awaiting_approval","not_found","already_running",
+    "action_required","requires_discord_client"].includes(state)?state:"completed";
+  await audit(env,owner,tool.slice(0,85),"Estado: "+summary);
+}
 export async function stateCall(env,name,args={},ctx={}){
  const owner=user(ctx);
  if(name==="auth_status")return {state:"connected",user_id:owner,oauth_scopes:["identify","guilds","guilds.members.read"],
