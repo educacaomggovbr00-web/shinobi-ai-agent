@@ -1,14 +1,222 @@
 {
-  "id": "bushin-shot-rp-39188253738-04",
+  "id": "bushin-inspect-rp-39188253738-05",
   "session_id": "39188253738",
-  "action": "screenshot",
+  "action": "inspect_ui",
   "ok": true,
   "data": {
-    "artifact_id": 12160331937,
-    "artifact_name": "bushin-snapshot-39188253738-f4fac3c3b3fb4d",
-    "retention_days": 1,
-    "visible_page": "https://discord.com/channels/1515877468299595919/1520116350360617154",
-    "note": "Private Actions artifact only; request its download to show the JPEG in ChatGPT."
+    "controls": [
+      {
+        "x": 1240,
+        "y": 16,
+        "label": "Caixa de Entrada",
+        "kind": "div"
+      },
+      {
+        "x": 1276,
+        "y": 16,
+        "label": "Ajuda",
+        "kind": "div"
+      },
+      {
+        "x": 1282,
+        "y": 51,
+        "label": "Ignorar",
+        "kind": "div"
+      },
+      {
+        "x": 1166,
+        "y": 51,
+        "label": "Baixar",
+        "kind": "button"
+      },
+      {
+        "x": 206,
+        "y": 94,
+        "label": "ʚ🍥ɞ 𝐍aruto 𝐏roject ᴿᴾ ⁺ ✦ ˙, ações de servidor",
+        "kind": "div"
+      },
+      {
+        "x": 98,
+        "y": 94,
+        "label": "Servidor da Comunidade",
+        "kind": "div"
+      },
+      {
+        "x": 351,
+        "y": 94,
+        "label": "Convidar para o servidor",
+        "kind": "div"
+      },
+      {
+        "x": 223,
+        "y": 6,
+        "label": "não lida, │・⏳〃﹕𝐅ichas-𝐑esultado (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 40,
+        "label": "╰・───﹙約﹚﹐ⵌ (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 85,
+        "label": "─── . 👥୧! , 𝐒ocialização〃 (categoria)",
+        "kind": "div"
+      },
+      {
+        "x": 223,
+        "y": 114,
+        "label": "╭・───﹙録﹚﹐ⵌ (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 148,
+        "label": "não lida, │・💬〃﹕𝐂hat-𝐆eral (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 182,
+        "label": "não lida, │・🤖〃﹕𝐂omandos (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 216,
+        "label": "não lida, │・🤖〃﹕𝐂omandos² (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 250,
+        "label": "não lida, │・📸〃﹕𝐌ídias (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 284,
+        "label": "não lida, │・💎〃﹕𝐏érolas (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 318,
+        "label": "・⊱ㆍ─━❮『も』❯━─ㆍ⊰・ (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 352,
+        "label": "não lida, │・👾〃﹕𝐑eportar-𝐁ugs (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 386,
+        "label": "não lida, │・❓〃﹕𝐃úvidas (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 420,
+        "label": "não lidas, │・🚨〃﹕𝐃enúncias (canal de fórum)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 454,
+        "label": "não lidas, │・💡〃﹕𝐒ugestões (canal de fórum)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 488,
+        "label": "│・📚〃﹕𝐆uias-𝐝a-𝐂omunidade (canal de fórum)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 522,
+        "label": "・⊱ㆍ─━❮『も』❯━─ㆍ⊰・ (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 223,
+        "y": 556,
+        "label": "│・✨〃﹕𝐁ump (canal de texto)",
+        "kind": "a"
+      },
+      {
+        "x": 16,
+        "y": 523,
+        "label": "Gerenciar perfil e status",
+        "kind": "div"
+      },
+      {
+        "x": 224,
+        "y": 544,
+        "label": "Silenciar",
+        "kind": "button"
+      },
+      {
+        "x": 249,
+        "y": 544,
+        "label": "Opções de entrada",
+        "kind": "button"
+      },
+      {
+        "x": 281,
+        "y": 544,
+        "label": "Desativar áudio",
+        "kind": "button"
+      },
+      {
+        "x": 306,
+        "y": 544,
+        "label": "Opções de saída",
+        "kind": "button"
+      },
+      {
+        "x": 338,
+        "y": 544,
+        "label": "Configurações de usuário",
+        "kind": "button"
+      },
+      {
+        "x": 900,
+        "y": 94,
+        "label": "Tópicos",
+        "kind": "div"
+      },
+      {
+        "x": 940,
+        "y": 94,
+        "label": "Config. de notificação",
+        "kind": "div"
+      },
+      {
+        "x": 980,
+        "y": 94,
+        "label": "Mensagens fixadas",
+        "kind": "div"
+      },
+      {
+        "x": 1020,
+        "y": 94,
+        "label": "Mostrar lista de membros",
+        "kind": "div"
+      },
+      {
+        "x": 427,
+        "y": 40,
+        "label": "Ir para resposta",
+        "kind": "div"
+      }
+    ],
+    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154"
   },
-  "finished_at_utc": "2026-10-19T02:45:59.052908+00:00"
+  "finished_at_utc": "2026-10-19T02:47:07.081845+00:00"
 }
