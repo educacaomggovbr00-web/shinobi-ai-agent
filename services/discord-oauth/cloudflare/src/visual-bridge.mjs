@@ -9,6 +9,11 @@ const SMOKE_REF=REPO+"/.github/workflows/bushin-oidc-bridge-smoke.yml@refs/heads
 const ISS="https://token.actions.githubusercontent.com";
 const AUD="bushin-cloudflare-visual-v1";
 const GUILD="1515877468299595919";
+const OWNER_ID="260082480",REPO_ID="1424794298";
+const OIDC_SUBJECTS=new Set([
+ "repo:"+REPO+":ref:refs/heads/main",
+ "repo:educacaomggovbr00-web@"+OWNER_ID+"/shinobi-ai-agent@"+REPO_ID+":ref:refs/heads/main"
+]);
 const millis=()=>Date.now();
 const enc=new TextEncoder();
 const urlSafe=b=>btoa(String.fromCharCode(...b)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=/g,"");
@@ -42,7 +47,8 @@ export async function verifyGitHubOidc(jwt,{allowSmoke=false}={}){
  if(!v||v.head?.alg!=="RS256"||typeof v.head?.kid!=="string")return null;
  const c=v.payload,t=Math.floor(millis()/1000);
  if(c.iss!==ISS||c.aud!==AUD||c.repository!==REPO||c.ref!=="refs/heads/main"||
-    !(c.workflow_ref===REF||(allowSmoke&&c.workflow_ref===SMOKE_REF))||c.sub!=="repo:"+REPO+":ref:refs/heads/main"||
+    !(c.workflow_ref===REF||(allowSmoke&&c.workflow_ref===SMOKE_REF))||!OIDC_SUBJECTS.has(c.sub)||
+    String(c.repository_id)!==REPO_ID||String(c.repository_owner_id)!==OWNER_ID||
     !["workflow_dispatch","push"].includes(c.event_name)||c.runner_environment!=="github-hosted"||
     !/^[0-9]{8,20}$/.test(String(c.run_id||""))||
     !Number.isInteger(c.exp)||c.exp<=t||c.exp>t+600||
