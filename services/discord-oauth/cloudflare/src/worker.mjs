@@ -412,7 +412,7 @@ async function mobileHome(req,env){
    if(row?.user_id===env.BUSHIN_OWNER_DISCORD_ID){
      try{const c=await unseal(row.creds_encrypted,env);if(c.expires>now()+30000){
        const me=await verified(env,c);
-       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
+       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
      }}catch{}
    }
  }
@@ -426,6 +426,28 @@ export function personalCommandsConsentUrl(){
  url.searchParams.set("scope","applications.commands");
  url.searchParams.set("integration_type","1");
  return url.toString();
+}
+async function mobileFeatures(req,env){
+ ready(env);
+ const raw=mCookie(req,M_SESSION);
+ if(!/^[A-Za-z0-9_-]{40,80}$/.test(raw))return mGo("/mobile");
+ const record=await q(env,"SELECT user_id FROM mobile_user_sessions WHERE token_hash=? AND expires_at>?",await digest(raw),now()).first();
+ if(!record||record.user_id!==env.BUSHIN_OWNER_DISCORD_ID)return mGo("/mobile");
+ const github=typeof env.BUSHIN_GITHUB_TOKEN==="string"&&env.BUSHIN_GITHUB_TOKEN.length>=20;
+ const groups=[
+   {title:"Navegador visual",starts:["bushin_browser_"],note:github?"Ponte GitHub configurada; ainda precisa de sessão ativa e login no navegador.":"Ponte GitHub não configurada no Worker. Ferramentas não executam até haver sessão."},
+   {title:"Discord e Naruto RP",starts:["bushin_discord_"],note:botReady(env)?"Bot oficial configurado: ações limitadas aos canais autorizados.":"Identidade OAuth disponível; leitura e envio via bot dependem da instalação por administrador."},
+   {title:"Tarefas e estado",starts:["bushin_task_","bushin_save_state","bushin_load_state"],note:"Tarefas, aprovação, progresso e auditoria persistidos no D1. Sem agente executando em segundo plano."},
+   {title:"GitHub e arquivos",starts:["bushin_files_","bushin_github_"],note:github?"Ponte GitHub configurada; escritas pedem confirmação.":"GitHub do Worker exige BUSHIN_GITHUB_TOKEN. O plugin GitHub do chat é uma conexão separada."},
+   {title:"Autenticação e interface",starts:["bushin_auth_","bushin_permissions_","bushin_audit_","bushin_ui_","bushin_session_"],note:"Este painel mostra ferramentas cadastradas, não disponibiliza MCP nativo no ChatGPT Android."}
+ ];
+ const cards=groups.map(group=>{
+   const names=ADVANCED_TOOLS.filter(t=>group.starts.some(p=>t.name.startsWith(p)));
+   return '<details style="border:1px solid #384666;border-radius:12px;padding:13px;margin:12px 0"><summary style="cursor:pointer;font-weight:700">'+mEsc(group.title)+' ('+names.length+')</summary><p class="muted">'+mEsc(group.note)+'</p><ul style="padding-left:22px;line-height:1.9">'+
+      names.map(t=>'<li><code>'+mEsc(t.name.slice(7))+'</code></li>').join("")+'</ul></details>';
+ }).join("");
+ const note='<p class="muted">O aplicativo Discord autoriza identidade e comandos pessoais, mas não concede automaticamente leitura/DM/envio como usuário. O ChatGPT Android continua em modo skill-only; ferramentas MCP não estão conectadas ao app.</p>';
+ return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile">Voltar à conta</a>');
 }
 async function mobilePersonalCommands(req,env){
  ready(env);
@@ -479,6 +501,7 @@ export default {
       const b=base(env);
       if(new URL(req.url).origin!==b)return reply({error:"Unrecognized host"},403);
       if((path==="/"||path==="/mobile")&&req.method==="GET")return await mobileHome(req,env);
+      if(path==="/mobile/features"&&req.method==="GET")return await mobileFeatures(req,env);
       if(path==="/mobile/commands"&&req.method==="GET")return await mobilePersonalCommands(req,env);
       if(path==="/mobile/start"&&req.method==="GET")return await mobileStart(req,env);
       if(path==="/mobile/logout"&&req.method==="POST")return await mobileLogout(req,env);
