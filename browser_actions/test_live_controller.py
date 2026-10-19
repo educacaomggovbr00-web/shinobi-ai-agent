@@ -50,7 +50,7 @@ class BushinRemoteTests(unittest.TestCase):
         ):
             with self.subTest(channel=target), self.assertRaises(ValueError):
                 validate_command({**base, "channel_url":target, "action":"send_message", "confirm":True}, RUN)
-        for content in ("", "bad\\nline", "ping @everyone", "ola @here", "A"*501, " spaces "):
+        for content in ("", "bad\nline", "ping @everyone", "ola @here", "A"*501, " spaces "):
             with self.subTest(message=content[:25]), self.assertRaises(ValueError):
                 validate_command({**base, "text":content, "action":"send_message", "confirm":True}, RUN)
         with self.assertRaises(ValueError):
