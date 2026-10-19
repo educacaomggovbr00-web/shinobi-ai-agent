@@ -48,8 +48,8 @@ function instance(){
  const env={PUBLIC_BASE_URL:base,DB:db,DISCORD_CLIENT_SECRET:"nonlive-test-only",
   ENCRYPTION_KEY_BASE64:"nonlive-test-only",BUSHIN_OWNER_DISCORD_ID:id};
  const req=(path,options={})=>worker.fetch(new Request(base+path,{
-   headers:{cookie:"__Host-bushin_mobile="+cookieToken,...(options.headers||{})},
-   ...options
+   ...options,
+   headers:{cookie:"__Host-bushin_mobile="+cookieToken,...(options.headers||{})}
  }),env);
  return {env,db,req};
 }
