@@ -32,7 +32,9 @@ jobs:
                       return r.status,r.headers, r.read()
               except urllib.error.HTTPError as e:
                   return e.code,e.headers,e.read()
-          code,_,data=request("/health")
+          code,headers,data=request("/health")
+          if code!=200:
+              print("HEALTH HTTP",code,"type",headers.get("content-type"),"server",headers.get("server"),"body_prefix",repr(data[:170]))
           assert code==200,code
           health=json.loads(data)
           assert health["configuration_ready"] is True
