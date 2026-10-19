@@ -369,7 +369,7 @@ async function mcp(req,env){
           state:"connected",mcp_oauth_authenticated:true,
           discord_account:{id:me.id,username:me.username,display_name:me.display_name},
           member_naruto_rp:me.membership?.member===true,
-          granted_scopes:auth.record.scope.split(/\\s+/).filter(Boolean),
+          granted_scopes:auth.record.scope.split(/\s+/).filter(Boolean),
           available:{identity:true,server_list:true,naruto_membership:true,
             channel_messages_as_user:false,send_as_user:false},
           requires_linux_for_identity:false,
