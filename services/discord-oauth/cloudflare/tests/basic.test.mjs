@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import worker,{allowedRedirect,validScope,pkceVerify,classifyDiscordTokenFailure} from "../src/worker.mjs";
+import worker,{allowedRedirect,validScope,pkceVerify,classifyDiscordTokenFailure,personalCommandsConsentUrl} from "../src/worker.mjs";
 
 test("Only ChatGPT official callback paths accepted",()=>{
   assert.equal(allowedRedirect("https://chatgpt.com/connector_platform_oauth_redirect"),true);
@@ -74,4 +74,25 @@ test("Discord OAuth diagnostics never disclose secrets or provider descriptions"
    assert.ok(!category.includes("secret-or-auth-header"));
    assert.ok(!category.includes("raw-secret-or-customer-token"));
  }
+});
+
+test("Personal OAuth commands install is user-scoped and does not request guild administrator or messages",()=>{
+ const consent=new URL(personalCommandsConsentUrl());
+ assert.equal(consent.origin,"https://discord.com");
+ assert.equal(consent.pathname,"/oauth2/authorize");
+ assert.equal(consent.searchParams.get("client_id"),"1561589128108314636");
+ assert.equal(consent.searchParams.get("scope"),"applications.commands");
+ assert.equal(consent.searchParams.get("integration_type"),"1");
+ assert.equal(consent.searchParams.has("permissions"),false);
+ assert.equal(consent.searchParams.has("guild_id"),false);
+ assert.equal(consent.searchParams.has("redirect_uri"),false);
+ assert.equal(consent.searchParams.has("client_secret"),false);
+});
+test("Personal commands consent requires existing mobile session, preserving original login",async()=>{
+ const base="https://bushin-owner.workers.dev";
+ const env={PUBLIC_BASE_URL:base,DISCORD_CLIENT_SECRET:"fake-ci-only",ENCRYPTION_KEY_BASE64:"fake-ci-only",BUSHIN_OWNER_DISCORD_ID:"123456789012345678",DB:{}};
+ const denied=await worker.fetch(new Request(base+"/mobile/commands"),env);
+ assert.equal(denied.status,303);
+ assert.equal(denied.headers.get("location"),"/mobile");
+ assert.equal(denied.headers.get("set-cookie"),null);
 });
