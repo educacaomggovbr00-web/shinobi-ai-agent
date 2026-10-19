@@ -29,9 +29,14 @@ class BushinRemoteTests(unittest.TestCase):
             validate_command({**command, "session_id": "another-run"}, RUN)
 
     def test_no_posting_or_shell(self):
-        for action in ("type", "send_message", "post", "shell", "upload", "screenshot"):
+        for action in ("type", "send_message", "post", "shell", "upload"):
             with self.subTest(action=action), self.assertRaises(ValueError):
                 validate_command({"id": "test", "session_id": RUN, "action": action}, RUN)
+
+    def test_explicit_screenshot_allowed(self):
+        self.assertEqual(validate_command(
+            {"id": "shot1", "session_id": RUN, "action": "screenshot"}, RUN
+        ), "screenshot")
 
     def test_scroll_limits(self):
         for amount in (-1, 0, 9, 1.4, "3", True):
