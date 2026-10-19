@@ -742,6 +742,19 @@ export default {
       if(path==="/oauth/authorize"&&req.method==="GET")return await authorize(req,env);
       if(path==="/oauth/discord/callback"&&req.method==="GET")return await discordCallback(req,env);
       if(path==="/oauth/token"&&req.method==="POST")return await token(req,env);
+      if(path==="/mcp"&&req.method==="GET"){
+        const accept=req.headers.get("accept")||"";
+        // MCP is an authenticated POST API, not a browser page. For human
+        // navigation provide an explanation; for machine GETs advertise POST.
+        if(accept && !accept.includes("text/html")&&!accept.includes("*/*"))
+          return reply({error:"MCP requires POST",method:"POST",login_portal:"/mobile"},405,{"allow":"POST"});
+        return mPage("Bushin Browser — conexão ChatGPT",
+          '<p>Este endereço <code>/mcp</code> é uma API para clientes MCP, não um site para abrir como login.</p>'+
+          '<p><strong>Para chamar as ferramentas dentro do ChatGPT, o plugin Bushin precisa estar instalado e conectado como aplicativo compatível.</strong> Abrir esta página no navegador não faz essa instalação.</p>'+
+          '<p>A autorização Discord do painel móvel é separada da conexão MCP no ChatGPT. Você não precisa desconectar sua conta para testar a integração.</p>'+
+          '<a class="button" href="/mobile">Abrir o portal móvel do Bushin</a>'+
+          '<p class="muted">Ferramentas MCP: use o endpoint HTTPS /mcp com um cliente compatível e autorização OAuth. O navegador comum usa GET, enquanto as chamadas RPC usam POST.</p>');
+      }
       if(path==="/mcp"&&req.method==="POST")return await mcp(req,env);
       return reply({error:"Not found"},404);
     }catch(e){return oauthReply(e);}
