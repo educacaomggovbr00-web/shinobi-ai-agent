@@ -55,6 +55,27 @@ function channelUrl(value) {
 function validate(action, args) {
   const c={action};
   if (["status","read_page_text","rpg_view","inspect_ui","screenshot"].includes(action)) return c;
+  if (action==="tabs") {
+    if (args.tab_index!==undefined && (!Number.isInteger(args.tab_index)||args.tab_index<0||args.tab_index>20))
+      throw Error("Índice da aba inválido.");
+    if (args.tab_index!==undefined)c.tab_index=args.tab_index;
+    return c;
+  }
+  if (action==="compose_message") {
+    c.channel_url=channelUrl(args.channel_url);
+    if(typeof args.text!=="string"||!args.text.trim()||args.text.length>500||/[
+]/.test(args.text)||/@(?:everyone|here)/i.test(args.text))
+      throw Error("Mensagem de rascunho inválida.");
+    c.text=args.text;
+    return c;
+  }
+  if (action==="capture_gallery") {
+    if(!Array.isArray(args.urls)||args.urls.length<2||args.urls.length>4)
+      throw Error("Galeria exige de 2 a 4 canais.");
+    c.urls=args.urls.map(channelUrl);
+    if(new Set(c.urls).size!==c.urls.length)throw Error("Canais duplicados.");
+    return c;
+  }
   if (action==="open_url") {c.url=channelUrl(args.url);return c;}
   if (action==="rpg_scout") {
     if (!Array.isArray(args.urls) || args.urls.length<1 || args.urls.length>4) throw Error("Informe de 1 a 4 canais.");
@@ -96,13 +117,14 @@ export const BROWSER_TOOLS = [
   inputSchema:{type:"object",properties:{},additionalProperties:false},
   annotations:{readOnlyHint:true,destructiveHint:false}},
  {name:"bushin_browser_action",title:"Navegar no Discord com Bushin",
-  description:"Comanda apenas navegação e leitura na sessão visual já autenticada no Naruto Project RP. Nunca envia mensagens pessoais, DMs ou credenciais. A execução pode ficar pendente; consulte bushin_browser_result.",
+  description:"Comanda leitura, navegação, abas, capturas e preparação de rascunhos na sessão autorizada do Naruto RP. Nunca envia mensagens por esta ferramenta; confirme o resultado com bushin_browser_result.",
   inputSchema:{type:"object",properties:{
-   action:{type:"string",enum:["status","read_page_text","rpg_view","rpg_scout","inspect_ui","open_url","scroll","click","press","type_search","screenshot"]},
+   action:{type:"string",enum:["status","read_page_text","rpg_view","rpg_scout","inspect_ui","open_url","scroll","click","press","type_search","screenshot","tabs","capture_gallery","compose_message"]},
    url:{type:"string"},urls:{type:"array",items:{type:"string"},minItems:1,maxItems:4},
    direction:{type:"string",enum:["up","down"]},amount:{type:"integer",minimum:1,maximum:8},
    x:{type:"integer",minimum:0,maximum:1364},y:{type:"integer",minimum:0,maximum:767},
-   key:{type:"string"},text:{type:"string"}
+   key:{type:"string"},text:{type:"string"},channel_url:{type:"string"},
+   tab_index:{type:"integer",minimum:0,maximum:20}
   },required:["action"],additionalProperties:false},
   annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}},
  {name:"bushin_browser_result",title:"Resultado de ação do Bushin",
