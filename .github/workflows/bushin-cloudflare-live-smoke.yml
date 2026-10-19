@@ -1,0 +1,65 @@
+name: "🍥 Bushin Cloudflare — teste público sem tokens"
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/bushin-cloudflare-live-smoke.yml"
+permissions:
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: "Validar endpoints públicos sem autenticação ou dados pessoais"
+        env:
+          BUSHIN_BASE: "https://bushin-discord-direct.henrique-silva081106.workers.dev"
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const base=process.env.BUSHIN_BASE;
+          async function req(path,options={}) {
+            let err;
+            for(let i=0;i<3;i++){
+              try{
+                const res=await fetch(base+path,{...options,signal:AbortSignal.timeout(12000)});
+                const raw=await res.text();
+                let body;try{body=JSON.parse(raw)}catch{body={error:"Non-JSON response"}}
+                console.log(path,"HTTP",res.status, "fields",Object.keys(body).join(","));
+                return {res,body};
+              }catch(e){err=e;await new Promise(r=>setTimeout(r,900));}
+            }
+            throw err;
+          }
+          const h=await req("/health");
+          assert.equal(h.res.status,200);
+          assert.equal(h.body.configuration_ready,true);
+          assert.equal(h.body.connected,false);
+          assert.equal(h.body.no_github_dependency,true);
+          const m=await req("/.well-known/oauth-authorization-server");
+          assert.equal(m.res.status,200);
+          assert.equal(m.body.issuer,base);
+          assert.ok(m.body.code_challenge_methods_supported.includes("S256"));
+          const pr=await req("/.well-known/oauth-protected-resource");
+          assert.equal(pr.res.status,200);
+          assert.equal(pr.body.resource,base+"/mcp");
+          const rpc=await req("/mcp",{method:"POST",headers:{"content-type":"application/json"},
+              body:JSON.stringify({jsonrpc:"2.0",id:1,method:"initialize",
+                params:{protocolVersion:"2025-06-18",clientInfo:{name:"smoke-test",version:"1"},capabilities:{}}})});
+          assert.equal(rpc.res.status,200);
+          assert.equal(rpc.body.result.serverInfo.name,"bushin-browser-discord-direct");
+          const listing=await req("/mcp",{method:"POST",headers:{"content-type":"application/json"},
+            body:JSON.stringify({jsonrpc:"2.0",id:2,method:"tools/list",params:{}})});
+          assert.equal(listing.res.status,200);
+          assert.deepEqual(listing.body.result.tools.map(t=>t.name).sort(),[
+            "bushin_discord_naruto_membership","bushin_discord_whoami"
+          ]);
+          const denied=await req("/mcp",{method:"POST",headers:{"content-type":"application/json"},
+            body:JSON.stringify({jsonrpc:"2.0",id:3,method:"tools/call",
+              params:{name:"bushin_discord_whoami",arguments:{}}})});
+          assert.equal(denied.res.status,401);
+          console.log("Bushin HTTPS OAuth+MCP smoke checks PASSED. No account login attempted.");
+          NODE
