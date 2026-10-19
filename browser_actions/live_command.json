@@ -1,6 +1,5 @@
 {
-  "id": "bushin-test-open-rp-39184315765-02",
+  "id": "bushin-test-inspect-39184315765-03",
   "session_id": "39184315765",
-  "action": "open_url",
-  "url": "https://discord.com/channels/1515877468299595919/1520116350360617154"
+  "action": "inspect_ui"
 }
