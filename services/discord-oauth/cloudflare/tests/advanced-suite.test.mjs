@@ -184,3 +184,40 @@ test("Android tool dashboard requires the same secure mobile owner session",asyn
  assert.doesNotMatch(html,/fake-discord-client-secret-only-for-testing/);
  assert.equal(logged.headers.get("cache-control"),"no-store");
 });
+
+test("bot DM recipient check independent of guild, with clear unavailable and confirmation semantics",async t=>{
+ const env={...minimal};
+ const state=await discordCall(env,"discord_dm_status",{},ctx);
+ assert.equal(state.bot_token_configured,false);
+ assert.equal(state.requires_guild_admin,false);
+ const unavailable=await discordCall(env,"discord_send_dm",{recipient_id:owner,content:"Teste",confirmed:true},ctx);
+ assert.equal(unavailable.state,"unavailable");
+ const botEnv={...env,DISCORD_BOT_TOKEN:"fake-bot-token-for-test-only-abcdefghijklmnopqrstuvwxyz"};
+ assert.equal((await discordCall(botEnv,"discord_dm_status",{},ctx)).bot_token_configured,true);
+ const unapproved=await discordCall(botEnv,"discord_send_dm",{
+   recipient_id:"999999999999999999",content:"hello",confirmed:true
+ },ctx);
+ assert.equal(unapproved.state,"unavailable");
+ const previous=globalThis.fetch;let called=0;
+ t.after(()=>{globalThis.fetch=previous});
+ globalThis.fetch=async(url,options)=>{
+   called++;
+   assert.match(options.headers.authorization,/^Bot /);
+   if(String(url).endsWith("/users/@me/channels")){
+     assert.equal(options.method,"POST");
+     assert.equal(JSON.parse(options.body).recipient_id,owner);
+     return Response.json({id:"222222222222222222",type:1});
+   }
+   assert.match(String(url),/\/channels\/222222222222222222\/messages$/);
+   assert.deepEqual(JSON.parse(options.body).allowed_mentions,{parse:[]});
+   return Response.json({id:"333333333333333333"});
+ };
+ await assert.rejects(()=>discordCall(botEnv,"discord_send_dm",{
+   recipient_id:owner,content:"Oi",confirmed:false
+ },ctx),/Confirme/);
+ assert.equal(called,0);
+ const posted=await discordCall(botEnv,"discord_send_dm",{recipient_id:owner,content:"Oi",confirmed:true},ctx);
+ assert.equal(posted.sent,true);
+ assert.equal(posted.recipient_id,owner);
+ assert.equal(called,2);
+});
