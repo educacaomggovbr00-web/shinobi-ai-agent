@@ -104,7 +104,8 @@ CREATE TABLE IF NOT EXISTS bushin_visual_sessions (
  token_hash TEXT NOT NULL,
  created_at INTEGER NOT NULL,
  expires_at INTEGER NOT NULL,
- last_seen INTEGER NOT NULL
+ last_seen INTEGER NOT NULL,
+ takeover_encrypted TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_visual_owner ON bushin_visual_sessions(owner_id,created_at);
 CREATE TABLE IF NOT EXISTS bushin_visual_commands (
