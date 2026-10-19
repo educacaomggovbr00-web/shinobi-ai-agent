@@ -1,5 +1,7 @@
 {
-  "id": "bushin-mission-areas-39188253738-20",
+  "id": "bushin-fichas-open-39188253738-21",
   "session_id": "39188253738",
-  "action": "inspect_ui"
+  "action": "click",
+  "x": 223,
+  "y": 5
 }
