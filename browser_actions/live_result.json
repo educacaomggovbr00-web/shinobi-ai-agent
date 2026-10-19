@@ -1,11 +1,13 @@
 {
-  "id": "bushin-rpg-open-channel-39188253738-02",
+  "id": "bushin-rpg-check-redirect-39188253738-03",
   "session_id": "39188253738",
-  "action": "open_url",
+  "action": "status",
   "ok": true,
   "data": {
-    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
-    "title": "Discord"
+    "online": true,
+    "url": "https://discord.com/login",
+    "title": "Discord",
+    "public_entry_url": "https://asking-determined-tracked-salvation.trycloudflare.com/vnc.html?autoconnect=1&resize=scale"
   },
-  "finished_at_utc": "2026-10-19T02:15:32.189106+00:00"
+  "finished_at_utc": "2026-10-19T02:15:50.502236+00:00"
 }
