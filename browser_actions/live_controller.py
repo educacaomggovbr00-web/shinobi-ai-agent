@@ -2,7 +2,7 @@
 """Bushin private GitHub Actions command bridge for the live Chromium window.
 
 Only commands from this private repository, scoped to the active Actions run.
-Never accepts Discord passwords, login codes, Discord API tokens or chat posting.
+Never accepts Discord passwords, login codes or Discord API tokens.\nPosting requires an explicit confirmed command, exact guild channel and strict limits.
 Do not store screenshots/cookies in GitHub.
 """
 import asyncio
@@ -80,7 +80,7 @@ def validate_command(command, run_id):
     if not isinstance(ident, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", ident):
         raise ValueError("Invalid command id")
     action = command.get("action")
-    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery", "rpg_scout", "rpg_view"):
+    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery", "rpg_scout", "rpg_view", "compose_message", "send_message", "send_command"):
         raise ValueError("Unsupported action: use status, RPG scout/view, gallery, and authorized navigation/reading")
     if action == "open_url":
         validate_url(command.get("url"))
@@ -88,6 +88,22 @@ def validate_command(command, run_id):
         validate_gallery_urls(command.get("urls"))
     if action == "rpg_scout":
         validate_scout_urls(command.get("urls"))
+    if action in ("compose_message", "send_message", "send_command"):
+        target = command.get("channel_url")
+        validate_url(target)
+        if not re.fullmatch(r"/channels/" + re.escape(GUILD_ID) + r"/[0-9]{15,22}", urlsplit(target).path):
+            raise ValueError("Message action requires a specific Naruto RP channel")
+        value = command.get("text")
+        if not isinstance(value, str) or not 1 <= len(value) <= 500 or value != value.strip():
+            raise ValueError("Message must be 1-500 characters without outer whitespace")
+        if any(c in value for c in ("\\n", "\\r", "\\x00")):
+            raise ValueError("Message must be a single line")
+        if re.search(r"@(everyone|here)\\b", value, re.I):
+            raise ValueError("Mass mentions are not supported")
+        if action == "send_command" and not re.fullmatch(r"[!/.][a-zA-Z0-9_-]{1,40}(?: [a-zA-Z0-9_ -]{1,120})?", value):
+            raise ValueError("Commands need a valid bot prefix and short arguments")
+        if action in ("send_message", "send_command") and command.get("confirm") is not True:
+            raise ValueError("Sending requires confirm:true and an exact channel")
     if action == "scroll":
         if command.get("direction", "down") not in ("up", "down"):
             raise ValueError("Invalid scroll direction")
@@ -245,6 +261,49 @@ async def safe_point_click(page, x, y):
     await page.wait_for_timeout(350)
     return {"clicked": [x,y], "url": redacted_page_url(page.url)}
 
+async def prepare_channel_message(page, channel_url, value, *, send=False):
+    """Type into a verified text channel composer; optionally send one message.
+
+    The caller already validated text/channel/confirmation. This function
+    verifies the real browser location and visible composer before writing.
+    Never presses Enter in a login form, a DM, or another Discord server.
+    """
+    assert_rp_channel(page.url)
+    if urlsplit(page.url).path != urlsplit(channel_url).path:
+        await page.goto(channel_url, wait_until="domcontentloaded", timeout=22000)
+        await page.wait_for_timeout(600)
+    assert_rp_channel(page.url)
+    if urlsplit(page.url).path != urlsplit(channel_url).path:
+        raise ValueError("Discord did not open the exact requested channel")
+    if await page.locator('input[type="password"]').count():
+        raise ValueError("Login overlay visible; type/send action refused")
+
+    # Discord uses a Slate contenteditable editor for its ordinary channel
+    # composer. Never fall back to generic textboxes (search, edit message, DMs).
+    composer = page.locator('[role="textbox"][data-slate-editor="true"][contenteditable="true"]')
+    if await composer.count() != 1 or not await composer.is_visible():
+        raise ValueError("Exactly one channel message composer must be visible")
+    disabled = await composer.get_attribute("aria-disabled")
+    if disabled == "true":
+        raise ValueError("Channel composer is disabled")
+    await composer.click()
+    await composer.fill(value, timeout=9000)
+    if not send:
+        return {"draft_ready": True, "channel_url": redacted_page_url(page.url),
+                "characters": len(value), "sent": False}
+    # Re-check destination and focused editor directly before submitting.
+    if urlsplit(page.url).path != urlsplit(channel_url).path:
+        raise ValueError("Destination changed during message composition")
+    if not await composer.is_visible():
+        raise ValueError("Composer disappeared before sending")
+    await composer.press("Enter", timeout=6000)
+    await page.wait_for_timeout(700)
+    remaining = await composer.inner_text(timeout=6000)
+    if remaining.strip():
+        raise RuntimeError("Message may not have been accepted; do not retry blindly")
+    return {"submitted": True, "channel_url": redacted_page_url(page.url),
+            "characters": len(value), "note": "Browser Enter submitted once; server delivery not independently verified"}
+
 async def safe_type_search(page, value):
     assert_rp_channel(page.url)
     search = page.locator(
@@ -326,6 +385,9 @@ async def perform(action, command):
             current_url = redacted_page_url(page.url)
             if action == "rpg_view":
                 return await extract_rpg_view(page)
+            if action in ("compose_message", "send_message", "send_command"):
+                return await prepare_channel_message(page, command["channel_url"], command["text"],
+                                                     send=(action != "compose_message"))
             if action == "rpg_scout":
                 return await scout_rpg_channels(page, command["urls"])
             if action == "inspect_ui":
@@ -416,6 +478,8 @@ async def listen_commands():
     except Exception:
         last_id = None
     screenshot_count = 0
+    messages_sent = 0
+    last_sent_at = 0.0
     print("🍥 Bushin control ready: commands through private GitHub repository, run " + run_id, flush=True)
     while True:
         try:
@@ -430,6 +494,16 @@ async def listen_commands():
                     if screenshot_count + requested > 12:
                         raise ValueError("Screenshot limit reached (12 per Linux session)")
                     screenshot_count += requested
+                    sending = action in ("send_message", "send_command")
+                    if sending:
+                        if messages_sent >= 8:
+                            raise ValueError("Maximum 8 outgoing actions for this desktop session")
+                        if time.monotonic() - last_sent_at < 20:
+                            raise ValueError("Wait 20 seconds between outgoing actions")
+                        # Count before submission to avoid retrying an ambiguous
+                        # browser failure and accidentally posting twice.
+                        messages_sent += 1
+                        last_sent_at = time.monotonic()
                     value = await perform(action, command)
                     result = {"id": current_id, "session_id": run_id,
                               "action": action, "ok": True, "data": value}
