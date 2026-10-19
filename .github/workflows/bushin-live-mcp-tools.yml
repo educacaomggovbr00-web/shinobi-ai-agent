@@ -26,6 +26,22 @@ jobs:
             });
             return {status:response.status,data:await response.json()};
           };
+          const browser=await fetch(url+"?utm_source=chatgpt.com",{
+            method:"GET",headers:{accept:"text/html,application/xhtml+xml"},
+            signal:AbortSignal.timeout(14000)
+          });
+          assert.equal(browser.status,200,"Browser MCP link must not show Not Found");
+          assert.match(browser.headers.get("content-type")||"",/text\\/html/);
+          const browserHtml=await browser.text();
+          assert.match(browserHtml,/API para clientes MCP/);
+          assert.match(browserHtml,/href="\\/mobile"/);
+          const machineGet=await fetch(url,{
+            method:"GET",headers:{accept:"text/event-stream"},
+            signal:AbortSignal.timeout(14000)
+          });
+          assert.equal(machineGet.status,405);
+          assert.equal(machineGet.headers.get("allow"),"POST");
+          console.log("MCP browser landing verified: 200 with utm_source; machine GET: 405");
           const initialized=await call(1,"initialize",{protocolVersion:"2025-06-18",clientInfo:{name:"bushin-read-only-smoke",version:"1"},capabilities:{}});
           assert.equal(initialized.status,200);
           assert.equal(initialized.data.result.serverInfo.name,"bushin-browser-discord-direct");
