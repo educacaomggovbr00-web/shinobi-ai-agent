@@ -153,3 +153,34 @@ test("GitHub writes/launches require confirmation and fixed paths",async t=>{
  await assert.rejects(()=>repoCall(env,"files_upload",{path:"bushin_workspace/readme.txt",content:"ok",confirmed:false}),/confirmação/);
  assert.equal(count,1);
 });
+
+test("Android tool dashboard requires the same secure mobile owner session",async()=>{
+ const token="A".repeat(52);
+ const hash=Buffer.from(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token))).toString("base64url");
+ let calls=0;
+ const env={...minimal,DB:{prepare(sql){
+   calls++;
+   assert.match(sql,/SELECT user_id FROM mobile_user_sessions/);
+   return {bind(actualHash,limit){
+      assert.equal(actualHash,hash);
+      assert.ok(limit>Date.now()-1000);
+      return {first:async()=>({user_id:owner})};
+   }};
+ }}};
+ const unauth=await worker.fetch(new Request(base+"/mobile/features"),env);
+ assert.equal(unauth.status,303);
+ assert.equal(unauth.headers.get("location"),"/mobile");
+ assert.equal(calls,0);
+ const logged=await worker.fetch(new Request(base+"/mobile/features",{
+   headers:{cookie:"__Host-bushin_mobile="+token}
+ }),env);
+ assert.equal(logged.status,200);
+ const html=await logged.text();
+ assert.match(html,/Ferramentas do Bushin/);
+ assert.match(html,/browser_tabs/);
+ assert.match(html,/task_start/);
+ assert.match(html,/Arquivos/);
+ assert.match(html,/skill-only/);
+ assert.doesNotMatch(html,/fake-discord-client-secret-only-for-testing/);
+ assert.equal(logged.headers.get("cache-control"),"no-store");
+});
