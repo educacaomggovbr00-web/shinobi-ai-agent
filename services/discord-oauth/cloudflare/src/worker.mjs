@@ -625,7 +625,7 @@ async function mobileDm(req,env){
    '<label>Mensagem de teste (até 300 caracteres)<textarea name="message" rows="3" maxlength="300" required style="display:block;background:#0b1020;color:white;border:1px solid #526483;border-radius:8px;padding:12px;box-sizing:border-box;width:100%;margin-top:8px" placeholder="Olá! Testando o Bushin."></textarea></label>'+
    '<label style="display:block;margin-top:12px"><input type="checkbox" name="confirmed" value="yes" required> Confirmo o envio de UMA DM para minha própria conta Discord, em nome do bot Bushin.</label>'+
    '<button class="button" type="submit">Enviar uma DM de teste</button></form>':
-   '<p>Para habilitar o teste, abra o Discord Developer Portal, selecione o aplicativo Bushin e configure o Bot Token como segredo na Cloudflare. Não cole nenhuma chave neste chat.</p>'+
+   '<p>Para habilitar o teste, abra o Discord Developer Portal, selecione o aplicativo Bushin e configure a variável secreta DISCORD_BOT_TOKEN na Cloudflare. Não cole nenhuma chave neste chat.</p>'+
    '<a class="button" href="https://discord.com/developers/applications/1561589128108314636/bot">Configurar meu bot no Discord</a>'+
    '<a class="button" href="https://dash.cloudflare.com/">Abrir Cloudflare — Variables and Secrets</a>';
  return mPage("Bushin — DM de teste",'<p class="ok">✓ Conta pessoal confirmada pelo OAuth.</p>'+
