@@ -16,8 +16,7 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
         self.server = TestServer(make_app(self.secret))
         self.client = TestClient(self.server)
         await self.client.start_server()
-        self.origin = "https://" + self.client.make_url("/").host
-        # aiohttp.URL.host excludes ports; the proxy gate uses the full Host.
+        # A local test server uses localhost; production uses a Cloudflare domain.
         self.origin = "https://" + self.client.make_url("/").authority
 
     async def asyncTearDown(self):
@@ -61,6 +60,19 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
                                           allow_redirects=False)
         self.assertEqual(response.status, 302)
         self.assertIn("bushin_session=", response.headers["Set-Cookie"])
+
+    async def test_cloudflare_origin_with_local_backend_host(self):
+        # Reverse proxies may set Host=localhost while browser Origin is the public tunnel.
+        public_origin = "https://bushin-test.example.trycloudflare.com"
+        self.server.app["public_origin"]["url"] = public_origin
+        response = await self.client.post(
+            "/login", data={"access_key": self.secret},
+            headers={"Origin": public_origin}, allow_redirects=False)
+        self.assertEqual(response.status, 302)
+        response = await self.client.post(
+            "/login", data={"access_key": self.secret},
+            headers={"Origin": "https://malicious.example"}, allow_redirects=False)
+        self.assertEqual(response.status, 403)
 
 
 if __name__ == "__main__":
