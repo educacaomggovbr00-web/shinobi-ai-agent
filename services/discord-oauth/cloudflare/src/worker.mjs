@@ -12,6 +12,7 @@ import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
 import {logToolAction,stateCall} from "./state-suite.mjs";
+import {visualRunner,visualMobile} from "./visual-bridge.mjs";
 import {discordCall,officialBotDmReady,officialBotIdentity} from "./discord-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
@@ -419,7 +420,7 @@ async function mobileHome(req,env){
    if(row?.user_id===env.BUSHIN_OWNER_DISCORD_ID){
      try{const c=await unseal(row.creds_encrypted,env);if(c.expires>now()+30000){
        const me=await verified(env,c);
-       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/dm">DM de teste do Bushin</a><a class="button" href="/mobile/workspace">Tarefas e memória — usar agora</a><a class="button" href="/mobile/servers">Meus servidores Discord</a><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
+       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/dm">DM de teste do Bushin</a><a class="button" href="/mobile/visual">Controle visual do navegador</a><a class="button" href="/mobile/workspace">Tarefas e memória — usar agora</a><a class="button" href="/mobile/servers">Meus servidores Discord</a><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
      }}catch{}
    }
  }
@@ -459,7 +460,7 @@ async function mobileFeatures(req,env){
  '<p class="muted">Configure apenas pela interface segura, nunca envie Bot Token no chat.</p>'+
  '<a href="https://discord.com/developers/applications/1561589128108314636/bot">Abrir Bot no Discord Developer Portal</a></details>';
  const note=dmNote+'<p class="muted">OAuth identifica você e libera a solicitação de comandos pessoais. Não permite enviar mensagens como conta de usuário. O modo Android permanece skill-only. As ferramentas MCP continuam indisponíveis no aplicativo ChatGPT Android enquanto o plugin original não estiver instalado/conectado.</p>';
- return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/dm">Diagnóstico e DM de teste</a><a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
+ return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/dm">Diagnóstico e DM de teste</a><a class="button" href="/mobile/visual">Controlar navegador</a><a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
 }
 
 async function mobileSessionOwner(req,env){
@@ -686,6 +687,12 @@ export default {
       if(new URL(req.url).origin!==b)return reply({error:"Unrecognized host"},403);
       if((path==="/"||path==="/mobile")&&req.method==="GET")return await mobileHome(req,env);
       if(path==="/mobile/features"&&req.method==="GET")return await mobileFeatures(req,env);
+      if(path==="/mobile/visual"&&["GET","POST"].includes(req.method)){
+        const row=await mobileSessionOwner(req,env);
+        if(!row)return mGo("/mobile");
+        return await visualMobile(req,env,{ownerId:row.user_id,escape:mEsc,page:mPage,redirect:mGo,base:ready(env)});
+      }
+      if(path.startsWith("/bridge/runner/"))return await visualRunner(req,env);
       if(path==="/mobile/workspace"&&["GET","POST"].includes(req.method))return await mobileWorkspace(req,env);
       if(path==="/mobile/servers"&&req.method==="GET")return await mobileServers(req,env);
       if(path==="/mobile/dm"&&["GET","POST"].includes(req.method))return await mobileDm(req,env);
