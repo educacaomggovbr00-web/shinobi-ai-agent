@@ -1,0 +1,47 @@
+name: "🍥 Bushin — ferramentas OAuth MCP publicadas (smoke)"
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/bushin-live-mcp-tools.yml"
+permissions:
+  contents: read
+jobs:
+  mcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Confirmar ferramentas reais na Cloudflare sem login ou segredos"
+        env:
+          BUSHIN_MCP: "https://bushin-discord-direct.henrique-silva081106.workers.dev/mcp"
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const url=process.env.BUSHIN_MCP;
+          const call=async (id,method,params={})=>{
+            const response=await fetch(url,{
+              method:"POST",headers:{"content-type":"application/json"},
+              body:JSON.stringify({jsonrpc:"2.0",id,method,params}),
+              signal:AbortSignal.timeout(14000)
+            });
+            return {status:response.status,data:await response.json()};
+          };
+          const initialized=await call(1,"initialize",{protocolVersion:"2025-06-18",clientInfo:{name:"bushin-read-only-smoke",version:"1"},capabilities:{}});
+          assert.equal(initialized.status,200);
+          assert.equal(initialized.data.result.serverInfo.name,"bushin-browser-discord-direct");
+          const listed=await call(2,"tools/list");
+          assert.equal(listed.status,200);
+          const tools=listed.data.result.tools||[];
+          const names=tools.map(t=>t.name);
+          assert.equal(new Set(names).size,names.length);
+          for(const name of ["bushin_discord_whoami","bushin_discord_list_servers","bushin_session_status"]){
+            assert.ok(names.includes(name),"Missing authorized tool "+name);
+            const t=tools.find(x=>x.name===name);
+            assert.equal(t.annotations.readOnlyHint,true);
+          }
+          const unauth=await call(3,"tools/call",{name:"bushin_session_status",arguments:{}});
+          assert.equal(unauth.status,401,"Unauthenticated call must be denied");
+          assert.ok(!JSON.stringify(unauth.data).includes("discord_account"));
+          console.log("Bushin MCP remote verified:",["bushin_discord_whoami","bushin_discord_list_servers","bushin_session_status"].join(", "));
+          console.log("OAuth required for real account data, no user login and no messages sent");
+          NODE
