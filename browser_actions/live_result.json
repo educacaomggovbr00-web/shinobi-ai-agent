@@ -1,11 +1,14 @@
 {
-  "id": "bushin-return-chamar-rp-39188253738-09",
+  "id": "bushin-chamar-shot-39188253738-10",
   "session_id": "39188253738",
-  "action": "open_url",
+  "action": "screenshot",
   "ok": true,
   "data": {
-    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
-    "title": "Discord"
+    "artifact_id": 12160700144,
+    "artifact_name": "bushin-snapshot-39188253738-dfc2b55332ae4c",
+    "retention_days": 1,
+    "visible_page": "https://discord.com/channels/1515877468299595919/1520116350360617154",
+    "note": "Private Actions artifact only; request its download to show the JPEG in ChatGPT."
   },
-  "finished_at_utc": "2026-10-19T02:49:28.917856+00:00"
+  "finished_at_utc": "2026-10-19T02:53:07.157893+00:00"
 }
