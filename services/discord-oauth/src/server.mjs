@@ -16,13 +16,18 @@ import {APPLICATION_CLIENT_ID,OAUTH_SCOPES,readBearer,
   authorizedProfile,narutoMembership,DiscordAuthError} from "./discord-api.mjs";
 import {CHANNELS,GUILD,safeBrowserAction,browserStatus,
   browserCommand,browserScreenshot} from "./github-bridge.mjs";
+import {configureOAuth,metadata,registerOAuthClient,beginAuthorize,discordCallback,
+  exchangeOAuthToken,resolveOAuthAccess,oauthErrorBody,oauthStatus} from "./oauth-bridge.mjs";
 
 const publicBase=process.env.PUBLIC_BASE_URL?.replace(/\/$/,"");
 const ownerId=process.env.BUSHIN_OWNER_DISCORD_ID||"";
+const discordSecret=process.env.DISCORD_CLIENT_SECRET||"";
 const port=Number(process.env.PORT||3000);
 if(!publicBase || !/^https:\/\/[a-z0-9.-]+(?::443)?$/i.test(publicBase)){
   throw new Error("Set PUBLIC_BASE_URL to a fixed HTTPS origin before starting Bushin MCP.");
 }
+// A real Discord OAuth login must not start without server-side secrets.
+configureOAuth({publicBase,ownerId,clientSecret:discordSecret});
 const app=express();
 app.disable("x-powered-by");
 app.use(express.json({limit:"32kb"}));
@@ -161,18 +166,41 @@ app.get("/health",(_req,res)=>res.json({
 for(const path of ["/.well-known/oauth-protected-resource",
   "/.well-known/oauth-protected-resource/mcp"]){
   app.get(path,(_req,res)=>res.json({
-    resource,authorization_servers:["https://discord.com"],scopes_supported:OAUTH_SCOPES
+    resource,authorization_servers:[publicBase],scopes_supported:OAUTH_SCOPES
   }));
 }
+// OAuth 2.1 Authorization Server endpoints owned by the original Bushin plugin.
+// DCR public clients, strict ChatGPT redirect URIs, PKCE S256, and a separate
+// Discord code flow; Discord tokens never appear in MCP clients or browser URLs.
+app.get("/.well-known/oauth-authorization-server",(_req,res)=>res.json(metadata()));
+app.post("/oauth/register",(req,res)=>{
+  try {res.status(201).json(registerOAuthClient(req.body));}
+  catch(e){res.status(oauthStatus(e)).json(oauthErrorBody(e));}
+});
+app.get("/oauth/authorize",(req,res)=>{
+  try {res.redirect(302,beginAuthorize(req.query));}
+  catch(e){res.status(oauthStatus(e)).json(oauthErrorBody(e));}
+});
+app.get("/oauth/discord/callback",async(req,res)=>{
+  try {res.redirect(302,await discordCallback(req.query));}
+  catch(e){res.status(oauthStatus(e)).json(oauthErrorBody(e));}
+});
+app.post("/oauth/token",express.urlencoded({extended:false,limit:"8kb"}),async(req,res)=>{
+  if(!req.is("application/x-www-form-urlencoded"))
+    return res.status(415).json({error:"invalid_request",error_description:"Form encoding required"});
+  try {res.json(await exchangeOAuthToken(req.body));}
+  catch(e){res.status(oauthStatus(e)).json(oauthErrorBody(e));}
+});
 app.post("/mcp",async(req,res)=>{
   const origin=req.get("origin");
   if(origin && origin!==publicBase)return res.sendStatus(403);
-  const token=readBearer(req.get("authorization"));
-  if(req.body?.method==="tools/call" && !token){
+  const bearer=readBearer(req.get("authorization"));
+  const session=bearer?resolveOAuthAccess(bearer):null;
+  if(req.body?.method==="tools/call" && !session){
     res.set("WWW-Authenticate",challenge);
     return res.status(401).json({error:"Bushin Discord OAuth required"});
   }
-  const server=createServer(token);
+  const server=createServer(session?.discordToken||null);
   const transport=new StreamableHTTPServerTransport({
     sessionIdGenerator:undefined,enableJsonResponse:true
   });
