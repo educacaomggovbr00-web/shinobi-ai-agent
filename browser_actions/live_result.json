@@ -1,12 +1,11 @@
 {
-  "id": "bushin-v15-status-check-39184315765-20261019-02",
+  "id": "bushin-39184315765-open-rp-20261019-03",
   "session_id": "39184315765",
-  "action": "status",
+  "action": "open_url",
   "ok": true,
   "data": {
-    "online": true,
-    "url": "https://discord.com/login",
+    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
     "title": "Discord"
   },
-  "finished_at_utc": "2026-10-19T01:23:39.814942+00:00"
+  "finished_at_utc": "2026-10-19T01:24:41.373917+00:00"
 }
