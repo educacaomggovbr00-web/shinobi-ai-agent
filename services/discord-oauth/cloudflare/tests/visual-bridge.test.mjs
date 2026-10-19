@@ -151,5 +151,5 @@ test("Signed GitHub Actions OIDC safely registers runner, exchanges one private 
  assert.equal((await confirmed.json()).stored,true);
  view=await visualMobile(new Request(origin+"/mobile/visual"),env,mobile);
  assert.match(await view.text(),/completed/);
- assert.match(await (await visualRunner(req("/bridge/runner/poll?run_id="+runId),env)).json(),/command/);
+ assert.equal((await (await visualRunner(req("/bridge/runner/poll?run_id="+runId),env)).json()).command,null);
 });
