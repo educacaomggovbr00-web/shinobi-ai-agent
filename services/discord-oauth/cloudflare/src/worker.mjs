@@ -9,6 +9,7 @@
  * only opaque Bushin-issued tokens, never raw Discord access/refresh tokens.
  */
 import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
+import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
 const SCOPES=["identify","guilds","guilds.members.read"];
@@ -312,11 +313,11 @@ async function mcp(req,env){
   if(method==="initialize")return rpc(id,{
     protocolVersion:"2025-06-18",capabilities:{tools:{listChanged:false}},
     serverInfo:{name:"bushin-browser-discord-direct",version:"1.0.0"},
-    instructions:"Identidade Discord via OAuth; leitura e envio SOMENTE como bot oficial instalado em canais explicitamente autorizados e após confirmação do usuário. Nunca como conta pessoal."
+    instructions:"Discord OAuth verifica o proprietário. O controle visual opcional usa uma sessão navegador separada, ações limitadas a leitura e navegação. Envio de mensagens só por bot oficial autorizado, nunca como conta pessoal."
   });
   if(method==="notifications/initialized")return new Response(null,{status:202});
   if(method==="ping")return rpc(id,{});
-  const activeTools=botReady(env)?TOOLS.concat(BOT_TOOLS):TOOLS;
+  const activeTools=TOOLS.concat(BROWSER_TOOLS,botReady(env)?BOT_TOOLS:[]);
   if(method==="tools/list")return rpc(id,{tools:activeTools});
   if(method==="tools/call"){
     const auth=await session(req,env);
@@ -327,7 +328,8 @@ async function mcp(req,env){
     if(!activeTools.some(t=>t.name===name))return rpcError(id,-32601,"Unknown tool");
     try{
       const me=await verified(env,auth.creds);
-      const data=BOT_TOOLS.some(t=>t.name===name)?await botCall(env,name,body.params?.arguments||{}):
+      const data=BROWSER_TOOLS.some(t=>t.name===name)?await browserCall(env,name,body.params?.arguments||{}):
+        BOT_TOOLS.some(t=>t.name===name)?await botCall(env,name,body.params?.arguments||{}):
         name==="bushin_discord_whoami"?
         {id:me.id,username:me.username,display_name:me.display_name,verified_account:true}:
         {username:me.username,...me.membership};
