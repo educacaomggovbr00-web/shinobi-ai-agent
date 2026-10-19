@@ -1,20 +1,16 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
-    "bushin-discord": {
+    "bushin-browser": {
       "type": "streamable-http",
-      "url": "https://YOUR-STABLE-HTTPS-HOST.example/mcp",
+      "url": "https://REPLACE-WITH-A-REAL-HTTPS-HOST.example/mcp",
       "extensions": {
         "com.openai": {
           "auth": {
             "type": "oauth",
             "client": {
-              "mode": "provided",
-              "clientId": "1561589128108314636",
-              "tokenEndpointAuthMethod": "client_secret_basic"
+              "mode": "dcr"
             },
-            "authorizationUrl": "https://discord.com/oauth2/authorize",
-            "tokenUrl": "https://discord.com/api/oauth2/token",
             "baseScopes": [
               "identify",
               "guilds",
