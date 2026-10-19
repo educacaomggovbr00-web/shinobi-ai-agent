@@ -294,7 +294,35 @@ async function session(req,env){
 }
 function rpc(id,result){return reply({jsonrpc:"2.0",id,result});}
 function rpcError(id,code,message){return reply({jsonrpc:"2.0",id,error:{code,message}});}
+// OpenAI connected-account identity: selected OAuth credential determines the profile.
+// The Discord snowflake is immutable and scoped to the verified owner; never expose tokens.
+export function discordProfileData(me){
+  const id=String(me?.id||"");
+  if(!/^\d{15,22}$/.test(id))throw new Error("Invalid verified Discord profile ID");
+  return {id,
+    ...(me.display_name?{name:String(me.display_name)}:{}),
+    ...(me.username?{nickname:"@"+String(me.username)}:{})
+  };
+}
+const PROFILE_OUTPUT={
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ type:"object",
+ properties:{
+  id:{type:"string",minLength:1,pattern:"\\S",description:"Stable opaque profile identifier for the authenticated Discord user."},
+  name:{type:"string",description:"Display name of the authenticated Discord account."},
+  nickname:{type:"string",description:"Discord account username for distinguishing connected accounts."}
+ },
+ required:["id"],
+ additionalProperties:false
+};
 const TOOLS=[
+ {name:"bushin_discord_profile",title:"Conta Discord conectada",
+   description:"Retorna a identidade estável e o nome da conta Discord autenticada via OAuth, permitindo que o ChatGPT a reconheça nas Contas conectadas. Não inclui email nem tokens.",
+   inputSchema:{type:"object",properties:{},additionalProperties:false},
+   outputSchema:PROFILE_OUTPUT,
+   securitySchemes:[{type:"oauth2",scopes:SCOPES}],
+   _meta:{"openai/profile":true},
+   annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
  {name:"bushin_discord_whoami",title:"Verificar conta Discord",
    description:"Discord OAuth oficial: informa somente a conta autenticada; sem e-mail, DMs ou mensagens.",
    inputSchema:{type:"object",properties:{},additionalProperties:false},
@@ -328,7 +356,8 @@ async function mcp(req,env){
     if(!activeTools.some(t=>t.name===name))return rpcError(id,-32601,"Unknown tool");
     try{
       const me=await verified(env,auth.creds);
-      const data=BROWSER_TOOLS.some(t=>t.name===name)?await browserCall(env,name,body.params?.arguments||{}):
+      const data=name==="bushin_discord_profile"?discordProfileData(me):
+        BROWSER_TOOLS.some(t=>t.name===name)?await browserCall(env,name,body.params?.arguments||{}):
         BOT_TOOLS.some(t=>t.name===name)?await botCall(env,name,body.params?.arguments||{}):
         name==="bushin_discord_whoami"?
         {id:me.id,username:me.username,display_name:me.display_name,verified_account:true}:
