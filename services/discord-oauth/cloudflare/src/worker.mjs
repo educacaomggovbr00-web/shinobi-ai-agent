@@ -12,7 +12,7 @@ import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
 import {logToolAction,stateCall} from "./state-suite.mjs";
-import {discordCall} from "./discord-suite.mjs";
+import {discordCall,officialBotDmReady} from "./discord-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
 const SCOPES=["identify","guilds","guilds.members.read"];
@@ -443,7 +443,7 @@ async function mobileFeatures(req,env){
  const github=typeof env.BUSHIN_GITHUB_TOKEN==="string"&&env.BUSHIN_GITHUB_TOKEN.length>=20;
  const groups=[
    {title:"Navegador visual",starts:["bushin_browser_"],note:github?"Ponte GitHub configurada; ainda precisa de sessão ativa e login no navegador.":"Ponte GitHub não configurada no Worker. Ferramentas não executam até haver sessão."},
-   {title:"Discord e Naruto RP",starts:["bushin_discord_"],note:botReady(env)?"Bot oficial configurado: ações limitadas aos canais autorizados.":"Identidade OAuth disponível; leitura e envio via bot dependem da instalação por administrador."},
+   {title:"Discord e Naruto RP",starts:["bushin_discord_"],note:botReady(env)?"Bot oficial configurado: ações limitadas aos canais autorizados.":"OAuth de identidade ativo. Canais e mensagens exigem bot instalado no servidor. DMs com bot usam configuração separada."},
    {title:"Tarefas e estado",starts:["bushin_task_","bushin_save_state","bushin_load_state"],note:"Tarefas, aprovação, progresso e auditoria persistidos no D1. Sem agente executando em segundo plano."},
    {title:"GitHub e arquivos",starts:["bushin_files_","bushin_github_"],note:github?"Ponte GitHub configurada; escritas pedem confirmação.":"GitHub do Worker exige BUSHIN_GITHUB_TOKEN. O plugin GitHub do chat é uma conexão separada."},
    {title:"Autenticação e interface",starts:["bushin_auth_","bushin_permissions_","bushin_audit_","bushin_ui_","bushin_session_"],note:"Este painel mostra ferramentas cadastradas, não disponibiliza MCP nativo no ChatGPT Android."}
@@ -453,7 +453,12 @@ async function mobileFeatures(req,env){
    return '<details style="border:1px solid #384666;border-radius:12px;padding:13px;margin:12px 0"><summary style="cursor:pointer;font-weight:700">'+mEsc(group.title)+' ('+names.length+')</summary><p class="muted">'+mEsc(group.note)+'</p><ul style="padding-left:22px;line-height:1.9">'+
       names.map(t=>'<li><code>'+mEsc(t.name.slice(7))+'</code></li>').join("")+'</ul></details>';
  }).join("");
- const note='<p class="muted">O aplicativo Discord autoriza identidade e comandos pessoais, mas não concede automaticamente leitura/DM/envio como usuário. O ChatGPT Android continua em modo skill-only; ferramentas MCP não estão conectadas ao app.</p>';
+ const dmConfigured=officialBotDmReady(env);
+ const dmNote='<details style="border:1px solid #384666;border-radius:12px;padding:13px;margin:12px 0"><summary style="cursor:pointer;font-weight:700">Enviar DM como bot oficial — '+(dmConfigured?'token configurado':'falta configuração')+'</summary>'+
+ '<p class="muted">'+(dmConfigured?'O token do bot está configurado. A entrega de DM ainda depende das permissões do Discord e de uma confirmação explícita.':'A DM do bot para o proprietário verificado não exige administrar o Naruto RP, mas precisa de um bot próprio e do segredo DISCORD_BOT_TOKEN na Cloudflare.')+'</p>'+
+ '<p class="muted">Configure apenas pela interface segura, nunca envie Bot Token no chat.</p>'+
+ '<a href="https://discord.com/developers/applications/1561589128108314636/bot">Abrir Bot no Discord Developer Portal</a></details>';
+ const note=dmNote+'<p class="muted">OAuth identifica você e libera a solicitação de comandos pessoais. Não permite enviar mensagens como conta de usuário. As ferramentas MCP continuam indisponíveis no aplicativo ChatGPT Android enquanto o plugin original não estiver instalado/conectado.</p>';
  return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
 }
 
