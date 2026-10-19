@@ -61,5 +61,25 @@ jobs:
             body:JSON.stringify({jsonrpc:"2.0",id:3,method:"tools/call",
               params:{name:"bushin_discord_whoami",arguments:{}}})});
           assert.equal(denied.res.status,401);
+          // Test the mobile portal, but never follow the Discord redirect or perform login.
+          const mobile=await fetch(base+"/mobile",{redirect:"manual",signal:AbortSignal.timeout(12000)});
+          assert.equal(mobile.status,200);
+          assert.match(mobile.headers.get("content-type"),/text\/html/);
+          const html=await mobile.text();
+          assert.ok(html.includes('href="/mobile/start"'));
+          assert.ok(html.includes("Conectar com Discord"));
+          assert.ok(!html.includes("DISCORD_CLIENT_SECRET"));
+          const start=await fetch(base+"/mobile/start",{redirect:"manual",signal:AbortSignal.timeout(12000)});
+          assert.equal(start.status,303);
+          const redirectTo=new URL(start.headers.get("location"));
+          assert.equal(redirectTo.hostname,"discord.com");
+          assert.equal(redirectTo.pathname,"/oauth2/authorize");
+          assert.equal(redirectTo.searchParams.get("client_id"),"1561589128108314636");
+          assert.equal(redirectTo.searchParams.get("code_challenge_method"),"S256");
+          assert.equal(redirectTo.searchParams.get("redirect_uri"),base+"/oauth/discord/callback");
+          assert.ok(start.headers.get("set-cookie").includes("HttpOnly"));
+          const forbidden=await fetch(base+"/mobile/logout",{method:"POST",redirect:"manual",headers:{"origin":"https://evil.example"},signal:AbortSignal.timeout(12000)});
+          assert.equal(forbidden.status,403);
+          console.log("Bushin mobile login page and official Discord redirect PASSED; no authorization performed.");
           console.log("Bushin HTTPS OAuth+MCP smoke checks PASSED. No account login attempted.");
           NODE
