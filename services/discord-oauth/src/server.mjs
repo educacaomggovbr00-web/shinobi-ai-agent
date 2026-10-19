@@ -3,8 +3,9 @@
  * This is the backend of the ORIGINAL private Bushin plugin, not a replacement.
  * No Discord self-bot, Discord password input, DM access or message posting.
  *
- * Requires a stable HTTPS origin, Discord app authorization configured through
- * the host's OAuth linking UI, and restricted GitHub + owner secrets in hosting.
+ * Discord identity/membership require stable HTTPS and Discord OAuth secrets only.
+ * The GitHub browser bridge is optional, disabled by default, and never part of
+ * the Discord login flow (BUSHIN_ENABLE_BROWSER_BRIDGE=1 to enable).
  */
 import express from "express";
 import {readFileSync} from "node:fs";
@@ -23,6 +24,12 @@ const publicBase=process.env.PUBLIC_BASE_URL?.replace(/\/$/,"");
 const ownerId=process.env.BUSHIN_OWNER_DISCORD_ID||"";
 const discordSecret=process.env.DISCORD_CLIENT_SECRET||"";
 const port=Number(process.env.PORT||3000);
+// Discord Direct is the default: official Discord OAuth/API only, no GitHub required.
+// The remote browser is an explicit, optional capability.
+const enableBrowser=process.env.BUSHIN_ENABLE_BROWSER_BRIDGE==="1";
+if (enableBrowser && !process.env.BUSHIN_GITHUB_TOKEN) {
+  throw new Error("Browser bridge was enabled without a private GitHub credential.");
+}
 if(!publicBase || !/^https:\/\/[a-z0-9.-]+(?::443)?$/i.test(publicBase)){
   throw new Error("Set PUBLIC_BASE_URL to a fixed HTTPS origin before starting Bushin MCP.");
 }
@@ -78,6 +85,7 @@ function createServer(token){
     "Confere via Discord OAuth2 se a conta conectada está no servidor Naruto Project RP. Não lê mensagens.",{},
     async()=>{if(!token)throw new DiscordAuthError("Faça login pelo Discord.",401);
       return narutoMembership(token,ownerId);});
+  if (enableBrowser) {
   registerTool(server,"bushin_browser_status","Status do navegador remoto",
     "Confere a execução Linux Bushin no GitHub Actions. Não lê DMs.",{},
     async()=>{await requireDiscord(token);return browserStatus();});
@@ -155,12 +163,15 @@ function createServer(token){
       return {...errorReply(e),structuredContent:{error:e.message||"Conexão indisponível"}};
     }
   });
+  }
   return server;
 }
 app.get("/health",(_req,res)=>res.json({
   service:"Bushin Browser MCP",version:"2.0.0",
   client_id:APPLICATION_CLIENT_ID,oauth_provider:"discord",
   login_required:true,connected:false,
+  mode:enableBrowser?"discord_with_optional_browser":"discord_direct",
+  requires_github_for_discord:false,
   note:"Service readiness does not prove Discord login, GitHub browser or active session."
 }));
 for(const path of ["/.well-known/oauth-protected-resource",
