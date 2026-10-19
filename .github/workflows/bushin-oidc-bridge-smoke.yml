@@ -1,4 +1,5 @@
 name: "🍥 Bushin Visual — teste OIDC sem Discord"
+# Run again after the Worker endpoint has been published.
 on:
   workflow_dispatch:
   push:
