@@ -1,7 +1,5 @@
 {
-  "id": "bushin-gallery-chat-click-39188253738-22",
+  "id": "bushin-gallery-chat-read-39188253738-23",
   "session_id": "39188253738",
-  "action": "click",
-  "x": 223,
-  "y": 147
+  "action": "read_page_text"
 }
