@@ -16,6 +16,10 @@ class MobileD1 {
     async first(){
      if(sql.startsWith("SELECT user_id,creds_encrypted FROM mobile_user_sessions"))
        return params[0]===hash?{user_id:id,creds_encrypted:"fake-encrypted-test-only"}:null;
+     if(sql.startsWith("SELECT * FROM bushin_tasks WHERE id=? AND owner_id=?")){
+       const task=db.tasks.get(params[0]);
+       return task?.owner_id===params[1]?task:null;
+     }
      throw Error("Unexpected first query "+sql);
     },
     async all(){
