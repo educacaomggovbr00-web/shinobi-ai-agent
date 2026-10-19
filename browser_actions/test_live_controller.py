@@ -95,5 +95,72 @@ class BushinRemoteTests(unittest.TestCase):
             validate_command({"id":"gallery2", "session_id":"other-run",
                               "action":"capture_gallery", "urls":[first,second]}, RUN)
 
+    def test_rpg_scout_safe_channels_and_session(self):
+        first = "https://discord.com/channels/1515877468299595919/1520116350360617154"
+        second = "https://discord.com/channels/1515877468299595919/1544461080624111716"
+        third = "https://discord.com/channels/1515877468299595919/1520114256740352061"
+        command = {"id": "rpgscout", "session_id": RUN,
+                   "action": "rpg_scout", "urls": [first, second, third]}
+        self.assertEqual(validate_command(command, RUN), "rpg_scout")
+        self.assertEqual(validate_command(
+            {"id": "rpgview", "session_id": RUN, "action": "rpg_view"}, RUN), "rpg_view")
+        forbidden = [
+            [], [first, first], [first]*5, "not-a-list",
+            [first, "https://discord.com/channels/@me/123456789012345678"],
+            [first, "https://discord.com/channels/999999999999999999/1520114256740352061"],
+            [first, "https://discord.com/login"],
+            [first, "https://discord.com/channels/1515877468299595919/invalid"],
+            [first, second + "?tracking=1"],
+        ]
+        for urls in forbidden:
+            with self.subTest(urls=urls), self.assertRaises(ValueError):
+                validate_command({**command, "urls": urls}, RUN)
+        with self.assertRaises(ValueError):
+            validate_command({**command, "session_id":"different"}, RUN)
+
+class BushinScoutNavigationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_restores_channel_even_if_one_read_fails(self):
+        from unittest.mock import AsyncMock, patch
+        from live_controller import scout_rpg_channels
+        original = "https://discord.com/channels/1515877468299595919/1520116350360617154"
+        first = "https://discord.com/channels/1515877468299595919/1520114256740352061"
+        second = "https://discord.com/channels/1515877468299595919/1544461080624111716"
+        class FakePage:
+            def __init__(self):
+                self.url = original
+                self.navigations = []
+            async def goto(self, target, **kwargs):
+                self.url = target
+                self.navigations.append(target)
+            async def wait_for_timeout(self, millis):
+                pass
+        page = FakePage()
+        with patch("live_controller.extract_rpg_view", new=AsyncMock(side_effect=[
+                {"url": first, "messages":[{"text":"treino"}], "topics":[]},
+                RuntimeError("Discord temporarily unavailable")])):
+            with self.assertRaises(RuntimeError):
+                await scout_rpg_channels(page, [first, second])
+        self.assertEqual(page.url, original)
+        self.assertEqual(page.navigations, [first, second, original])
+
+    async def test_collects_scoped_views_and_restores(self):
+        from unittest.mock import AsyncMock, patch
+        from live_controller import scout_rpg_channels
+        original = "https://discord.com/channels/1515877468299595919/1520116350360617154"
+        other = "https://discord.com/channels/1515877468299595919/1544461080624111716"
+        class FakePage:
+            url = original
+            async def goto(self, dest, **kwargs):
+                self.url = dest
+            async def wait_for_timeout(self, millis):
+                pass
+        page = FakePage()
+        with patch("live_controller.extract_rpg_view", new=AsyncMock(return_value={
+                "url": other, "messages":[], "topics":["Guia de treino"]})):
+            result = await scout_rpg_channels(page, [other])
+        self.assertEqual(result["checked"], 1)
+        self.assertEqual(result["channels"][0]["topics"], ["Guia de treino"])
+        self.assertEqual(page.url, original)
+
 if __name__ == "__main__":
     unittest.main()
