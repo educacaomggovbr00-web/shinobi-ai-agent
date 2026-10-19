@@ -1,6 +1,5 @@
 {
-  "id": "retry-open-discord-login-39178166963-003",
+  "id": "bushin-chat-panel-login-check-20261018-004",
   "session_id": "39178166963",
-  "action": "open_url",
-  "url": "https://discord.com/login?redirect_to=%2Fstore"
+  "action": "status"
 }
