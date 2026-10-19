@@ -51,7 +51,7 @@ def validate_command(command, run_id):
     if not isinstance(ident, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", ident):
         raise ValueError("Invalid command id")
     action = command.get("action")
-    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot"):
+    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search"):
         raise ValueError("Unsupported action: use status, open_url, read_page_text, scroll, click_navigation or screenshot")
     if action == "open_url":
         validate_url(command.get("url"))
@@ -66,9 +66,28 @@ def validate_command(command, run_id):
         validate_url(url)
         if "/channels/" + GUILD_ID not in url:
             raise ValueError("Navigation clicks limited to RP server channels")
+    if action == "click":
+        for axis, limit in (("x", 1365), ("y", 768)):
+            pos = command.get(axis)
+            if type(pos) is not int or pos < 0 or pos >= limit:
+                raise ValueError("Click coordinates must be integers within the browser viewport")
+    if action == "press":
+        if command.get("key") not in (
+            "Escape", "Tab", "Shift+Tab", "ArrowUp", "ArrowDown",
+            "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"
+        ):
+            raise ValueError("Only non-submitting navigation keys are permitted")
+    if action == "type_search":
+        value = command.get("text")
+        if not isinstance(value, str) or not 0 < len(value) <= 100 or any(c in value for c in ("\\n", "\\r")):
+            raise ValueError("Search text must be 1-100 characters with no newline")
     return action
 
-def gh_get(path):
+def assert_rp_channel(url):
+    parsed = urlsplit(url)
+    if parsed.hostname not in ("discord.com", "www.discord.com") or not parsed.path.startswith("/channels/" + GUILD_ID + "/"):
+        raise ValueError("Mouse and keyboard control only allowed inside Naruto Project RP")
+
     proc = subprocess.run(
         ["gh", "api", "repos/" + REPO + "/contents/" + path],
         capture_output=True, text=True, timeout=24)
@@ -116,6 +135,8 @@ def redacted_page_url(url):
     parsed = urlsplit(url)
     if parsed.hostname not in ("discord.com", "www.discord.com"):
         return "outside discord.com"
+    if parsed.path.startswith("/channels/@me"):
+        return "https://discord.com/channels/@me/[private]"
     return parsed.scheme + "://" + parsed.hostname + parsed.path[:250]
 
 async def publish_private_screenshot(page, run_id):
@@ -154,6 +175,55 @@ async def publish_private_screenshot(page, run_id):
     finally:
         image_file.unlink(missing_ok=True)
 
+async def visible_ui_controls(page):
+    """Expose coordinates of visible navigation affordances without exposing DOM/DMs."""
+    assert_rp_channel(page.url)
+    return await page.evaluate("""() => {
+      const selector = 'a,button,[role="link"],[role="button"]';
+      return [...document.querySelectorAll(selector)]
+        .map(el => {
+          const r = el.getBoundingClientRect();
+          const name = (el.getAttribute('aria-label') || el.getAttribute('title') ||
+                        el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 64);
+          return {x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2),
+                  label: name, kind: el.tagName.toLowerCase()};
+        })
+        .filter(it => it.x > 0 && it.x < innerWidth && it.y > 0 && it.y < innerHeight &&
+                      it.label.length > 0)
+        .slice(0, 35);
+    }""")
+
+async def safe_point_click(page, x, y):
+    assert_rp_channel(page.url)
+    info = await page.evaluate("""([x,y]) => {
+      const el = document.elementFromPoint(x,y);
+      if (!el) return {allowed:false};
+      const isInput = !!el.closest('input,textarea,select,[contenteditable="true"],[role="textbox"],form');
+      const label = (el.closest('button,[role="button"]')?.getAttribute('aria-label') ||
+                     el.closest('button,[role="button"]')?.getAttribute('title') ||
+                     '').toLowerCase();
+      const unsafe = /send|enviar|reply|responder|delete|excluir|invite|convidar|kick|ban|report|denunciar|attach|anexar|upload|comprar|purchase|gift/.test(label);
+      return {allowed:!isInput && !unsafe, name:label.slice(0,50)};
+    }""", [x,y])
+    if not info.get("allowed"):
+        raise ValueError("Clicked area is a form, message action, or sensitive control")
+    await page.mouse.click(x, y, button="left", delay=60)
+    await page.wait_for_timeout(350)
+    return {"clicked": [x,y], "url": redacted_page_url(page.url)}
+
+async def safe_type_search(page, value):
+    assert_rp_channel(page.url)
+    search = page.locator(
+        'input[type="search"], input[aria-label*="Search"], input[aria-label*="Buscar"], '
+        'input[placeholder*="Search"], input[placeholder*="Buscar"]')
+    if await search.count() == 0:
+        raise ValueError("No safe Discord search input found; chat composer is prohibited")
+    box = search.first
+    if not await box.is_visible():
+        raise ValueError("Search input not visible")
+    await box.fill(value, timeout=6500)
+    return {"search_filled": True, "characters": len(value), "url": redacted_page_url(page.url)}
+
 async def perform(action, command):
     from playwright.async_api import async_playwright
     async with async_playwright() as pw:
@@ -161,6 +231,23 @@ async def perform(action, command):
         try:
             page = await get_page(browser)
             current_url = redacted_page_url(page.url)
+            if action == "inspect_ui":
+                return {"controls": await visible_ui_controls(page), "url": redacted_page_url(page.url)}
+            if action == "click":
+                return await safe_point_click(page, command["x"], command["y"])
+            if action == "press":
+                assert_rp_channel(page.url)
+                if await page.locator(':focus').count():
+                    focused = await page.evaluate("""() => {
+                      const el = document.activeElement;
+                      return !!el?.closest('input, textarea, [contenteditable="true"], [role="textbox"]');
+                    }""")
+                    if focused:
+                        raise ValueError("Focus is in a text field; navigation key disabled to avoid editing chat")
+                await page.keyboard.press(command["key"])
+                return {"key": command["key"], "url": redacted_page_url(page.url)}
+            if action == "type_search":
+                return await safe_type_search(page, command["text"])
             if action == "screenshot":
                 return await publish_private_screenshot(page, command["session_id"])
             if action == "status":
