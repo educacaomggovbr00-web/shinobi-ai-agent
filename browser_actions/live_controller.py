@@ -88,6 +88,7 @@ def assert_rp_channel(url):
     if parsed.hostname not in ("discord.com", "www.discord.com") or not parsed.path.startswith("/channels/" + GUILD_ID + "/"):
         raise ValueError("Mouse and keyboard control only allowed inside Naruto Project RP")
 
+def gh_get(path):
     proc = subprocess.run(
         ["gh", "api", "repos/" + REPO + "/contents/" + path],
         capture_output=True, text=True, timeout=24)
