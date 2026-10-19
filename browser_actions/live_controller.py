@@ -80,8 +80,12 @@ def validate_command(command, run_id):
     if not isinstance(ident, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", ident):
         raise ValueError("Invalid command id")
     action = command.get("action")
-    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery", "rpg_scout", "rpg_view", "compose_message", "send_message", "send_command"):
+    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery", "rpg_scout", "rpg_view", "compose_message", "send_message", "send_command", "tabs"):
         raise ValueError("Unsupported action: use status, RPG scout/view, gallery, and authorized navigation/reading")
+    if action == "tabs" and "tab_index" in command:
+        idx = command.get("tab_index")
+        if type(idx) is not int or idx < 0 or idx > 20:
+            raise ValueError("Tab index must be 0..20")
     if action == "open_url":
         validate_url(command.get("url"))
     if action == "capture_gallery":
@@ -376,6 +380,28 @@ async def scout_rpg_channels(page, urls):
     return {"checked": len(readings), "channels": readings, "restored_to": redacted_page_url(original),
             "note": "Only rendered RP channel message bodies/forum topics; private GitHub result history. No posting."}
 
+async def safe_tabs(browser, selected_index=None):
+    """Only expose Naruto RP tabs, no DMs or other private website titles."""
+    allowed_pages = []
+    for context in browser.contexts:
+        for candidate in context.pages:
+            parsed = urlsplit(candidate.url)
+            if parsed.hostname in ("discord.com", "www.discord.com") and (
+                    parsed.path == "/channels/" + GUILD_ID
+                    or parsed.path.startswith("/channels/" + GUILD_ID + "/")):
+                allowed_pages.append(candidate)
+    if selected_index is not None:
+        if selected_index >= len(allowed_pages):
+            raise ValueError("Tab index outside the authorized Naruto RP pages")
+        await allowed_pages[selected_index].bring_to_front()
+    return {"tabs": [{
+        "index": i, "url": redacted_page_url(candidate.url),
+        "title": (await candidate.title())[:100]
+    } for i, candidate in enumerate(allowed_pages)],
+    "count": len(allowed_pages),
+    "selected": selected_index,
+    "note": "Only Naruto Project RP tabs are shown; login, DMs and other sites remain private"}
+
 async def perform(action, command):
     from playwright.async_api import async_playwright
     async with async_playwright() as pw:
@@ -383,6 +409,8 @@ async def perform(action, command):
         try:
             page = await get_page(browser)
             current_url = redacted_page_url(page.url)
+            if action == "tabs":
+                return await safe_tabs(browser, command.get("tab_index"))
             if action == "rpg_view":
                 return await extract_rpg_view(page)
             if action in ("compose_message", "send_message", "send_command"):
