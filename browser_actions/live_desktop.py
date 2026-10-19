@@ -168,6 +168,7 @@ async def start():
     browser_profile = Path("/tmp/bushin-private-discord-profile")
     browser_profile.mkdir(mode=0o700, parents=True, exist_ok=True)
     controller_task = None
+    cloudflare_task = None
 
     try:
         if not Path(VNC_DIR, "vnc.html").is_file():
@@ -252,6 +253,10 @@ async def start():
         # Authenticated GitHub command queue, independent from private VNC link.
         from live_controller import listen_commands
         controller_task = asyncio.create_task(listen_commands())
+        # Independent temporary signed GitHub Actions identity bridge. The
+        # Cloudflare bridge can fail without killing the secure desktop.
+        from cloudflare_bridge import run_bridge
+        cloudflare_task = asyncio.create_task(run_bridge())
         started = time.monotonic()
         browser_disconnects = 0
         browser_restarts = 0
@@ -259,6 +264,14 @@ async def start():
             await asyncio.sleep(30)
             if controller_task.done():
                 raise RuntimeError("The browser command receiver stopped")
+            if cloudflare_task is not None and cloudflare_task.done():
+                try:
+                    error = cloudflare_task.exception()
+                    if error:
+                        print("🍥 Cloudflare visual bridge unavailable:", type(error).__name__, flush=True)
+                except asyncio.CancelledError:
+                    pass
+                cloudflare_task = None  # GitHub queue remains available.
             if tunnel.poll() is not None:
                 raise RuntimeError("Tunel seguro foi encerrado")
             if any(p.poll() is not None for p in processes[:4]):
@@ -291,6 +304,9 @@ async def start():
                 print("🍥 Linux online - %s min decorridos" % minutes, flush=True)
         print("Limite da sessao encerrado. Fechando navegador.", flush=True)
     finally:
+        if cloudflare_task is not None:
+            cloudflare_task.cancel()
+            await asyncio.gather(cloudflare_task, return_exceptions=True)
         if controller_task is not None:
             controller_task.cancel()
             await asyncio.gather(controller_task, return_exceptions=True)
