@@ -1,7 +1,5 @@
 {
-  "id": "bushin-scan-server-39188253738-19",
+  "id": "bushin-mission-areas-39188253738-20",
   "session_id": "39188253738",
-  "action": "scroll",
-  "direction": "up",
-  "amount": 6
+  "action": "inspect_ui"
 }
