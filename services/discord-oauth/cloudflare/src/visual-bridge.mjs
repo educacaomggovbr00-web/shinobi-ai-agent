@@ -66,7 +66,7 @@ async function readRunner(req,env){
 }
 const validAction=new Set(["status","read_page_text","rpg_view","rpg_scout","inspect_ui","screenshot","capture_gallery","tabs",
  "scroll","press","click","open_url","compose_message","send_message","send_command","type_search"]);
-function validateMobileAction(form){
+export function validateMobileAction(form){
  const action=String(form.get("action")||"");
  if(!validAction.has(action))throw Error("Ação não suportada.");
  const args={};
