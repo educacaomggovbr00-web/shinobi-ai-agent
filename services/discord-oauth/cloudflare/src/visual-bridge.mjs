@@ -93,7 +93,7 @@ export function validateMobileAction(form){
    if(args.urls.length<(action==="capture_gallery"?2:1)||args.urls.length>4||new Set(args.urls).size!==args.urls.length)
      throw Error("Informe de 1 a 4 canais diferentes (galeria requer ao menos 2).");
  }
- if(action==="tabs"&&form.get("tab_index")!==""){
+ if(action==="tabs"&&form.has("tab_index")&&form.get("tab_index")!==""){
    const ix=Number(form.get("tab_index"));if(!Number.isInteger(ix)||ix<0||ix>20)throw Error("Aba inválida.");args.tab_index=ix;
  }
  if(action==="scroll"){
