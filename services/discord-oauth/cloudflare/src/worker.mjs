@@ -141,6 +141,14 @@ async function authorize(request,env){
   }))dst.searchParams.set(k,v);
   return redirect(dst.toString());
 }
+export function classifyDiscordTokenFailure(status,code){
+  const allowed=new Set(["invalid_client","invalid_grant","invalid_request","invalid_scope","unauthorized_client","unsupported_grant_type"]);
+  if(allowed.has(code))return "discord_"+code;
+  if(status===401||status===403)return "discord_invalid_client";
+  if(status===429)return "discord_rate_limited";
+  if(status>=500)return "discord_unavailable";
+  return "discord_auth";
+}
 async function discordToken(env,data){
   const basic=btoa(DISCORD_CLIENT_ID+":"+env.DISCORD_CLIENT_SECRET);
   const response=await fetch(DISCORD+"/oauth2/token",{
@@ -149,7 +157,17 @@ async function discordToken(env,data){
     body:new URLSearchParams(data),
     signal:AbortSignal.timeout(12000)
   });
-  if(!response.ok)throw oauthError("access_denied","Discord rejected the login.");
+  if(!response.ok){
+    // Only consume the whitelisted error class; never echo provider descriptions,
+    // request headers, authorization codes, token values or client secrets.
+    let providerCode="";
+    try{
+      const body=await response.json();
+      if(body && typeof body.error==="string")providerCode=body.error;
+    }catch{}
+    throw oauthError(classifyDiscordTokenFailure(response.status,providerCode),
+      "Discord rejected the authorization code exchange.");
+  }
   const j=await response.json();
   if(!j.access_token||!j.refresh_token||!Number.isFinite(j.expires_in))
     throw oauthError("access_denied","Invalid Discord token response.");
@@ -329,7 +347,15 @@ async function mobileHome(req,env){
    const reasons={
      state:"O navegador perdeu a sessão de login. Abra esta página no Chrome e conclua o Discord na mesma janela.",
      denied:"A autorização foi cancelada ou recusada pelo Discord.",
-     discord_auth:"O Discord recusou a troca da autorização. Pode ser um Client Secret inválido ou uma autorização expirada; precisamos conferir a configuração segura.",
+     discord_auth:"O Discord recusou a autorização sem indicar um motivo específico.",
+     discord_invalid_client:"O Discord rejeitou as credenciais do aplicativo Bushin. O Client Secret configurado na Cloudflare provavelmente está incorreto ou foi redefinido.",
+     discord_invalid_grant:"O código de autorização não foi aceito: pode ter expirado, sido usado anteriormente ou não coincidir com a verificação PKCE e a URL de retorno.",
+     discord_invalid_request:"O Discord rejeitou um parâmetro da troca OAuth. Vamos conferir o formato da solicitação.",
+     discord_invalid_scope:"O Discord rejeitou alguma das permissões solicitadas.",
+     discord_unauthorized_client:"A aplicação do Discord não está autorizada a usar este fluxo OAuth.",
+     discord_unsupported_grant_type:"O Discord não aceitou o tipo de concessão configurado.",
+     discord_rate_limited:"O Discord está limitando tentativas. Aguarde antes de tentar novamente.",
+     discord_unavailable:"O serviço OAuth do Discord está temporariamente indisponível.",
      owner:"A conta do Discord autorizada não corresponde ao ID do proprietário cadastrado no Bushin.",
      guild:"O Discord não confirmou essa conta como membro do Naruto Project RP.",
      scope:"O Discord não concedeu todas as três permissões de identidade solicitadas.",
@@ -373,10 +399,11 @@ async function mobileCallback(req,env){
    return mGo("/mobile",[mSet(M_FLOW,"",0),mSet(M_SESSION,session,Math.floor((until-now())/1000))]);
  }catch(e){
    const msg=String(e?.message||"");
+   const supported=new Set(["discord_auth","discord_invalid_client","discord_invalid_grant","discord_invalid_request","discord_invalid_scope","discord_unauthorized_client","discord_unsupported_grant_type","discord_rate_limited","discord_unavailable"]);
    const kind=msg.includes("not the Bushin owner")?"owner":
      msg.includes("not in Naruto Project RP")?"guild":
      e?.errorCode==="invalid_scope"?"scope":
-     msg.includes("Discord rejected the login")?"discord_auth":"service";
+     supported.has(e?.errorCode)?e.errorCode:"service";
    return mGo("/mobile?error="+kind,[mSet(M_FLOW,"",0)]);
  }
 }
