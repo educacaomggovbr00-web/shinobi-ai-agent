@@ -38,6 +38,25 @@ class BushinRemoteTests(unittest.TestCase):
             {"id": "shot1", "session_id": RUN, "action": "screenshot"}, RUN
         ), "screenshot")
 
+    def test_work_like_ui_actions(self):
+        for action in ("inspect_ui", "click", "press", "type_search"):
+            command = {"id": "work1", "session_id": RUN, "action": action}
+            command.update({"x": 100, "y": 220} if action == "click" else {})
+            command.update({"key": "Escape"} if action == "press" else {})
+            command.update({"text": "Naruto"} if action == "type_search" else {})
+            self.assertEqual(validate_command(command, RUN), action)
+
+    def test_prevent_unsafe_ui_commands(self):
+        for coords in ((-1,0), (1365,0), (0,768), ("5",5), (True,10)):
+            with self.subTest(coords=coords), self.assertRaises(ValueError):
+                validate_command({"id":"work2", "session_id":RUN, "action":"click", "x":coords[0], "y":coords[1]}, RUN)
+        for key in ("Enter", "Control+V", "Control+Shift+I", "Delete", "Space"):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_command({"id":"work3", "session_id":RUN, "action":"press", "key":key}, RUN)
+        for text in ("", "x"*101, "hello\\nworld"):
+            with self.subTest(search=text), self.assertRaises(ValueError):
+                validate_command({"id":"work4", "session_id":RUN, "action":"type_search", "text":text}, RUN)
+
     def test_scroll_limits(self):
         for amount in (-1, 0, 9, 1.4, "3", True):
             with self.subTest(amount=amount), self.assertRaises(ValueError):
