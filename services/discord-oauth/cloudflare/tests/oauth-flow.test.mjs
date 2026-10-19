@@ -61,8 +61,11 @@ function mockDiscordFetch(input,options){
     if(u.endsWith("/oauth2/token")){
       const form=options.body;
       assert.equal(options.method,"POST");
-      assert.match(options.headers.authorization,/^Basic /);
+      assert.equal(options.headers.authorization,undefined);
       assert.ok(form instanceof URLSearchParams);
+      assert.equal(form.get("client_id"),"1561589128108314636");
+      assert.equal(form.get("client_secret"),env.DISCORD_CLIENT_SECRET);
+      assert.equal(options.headers["content-type"],"application/x-www-form-urlencoded");
       const source=form.get("grant_type");
       assert.ok(["authorization_code","refresh_token"].includes(source));
       return Promise.resolve(new Response(JSON.stringify({
