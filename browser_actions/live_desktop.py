@@ -220,6 +220,8 @@ async def start():
         except asyncio.TimeoutError:
             raise RuntimeError("Cloudflare nao retornou endereco HTTPS em 100 segundos")
 
+        # Public hostname only: never publish the private /connect key.
+        Path("/tmp/bushin-public-origin").write_text(base_url.rstrip("/") + "/vnc.html?autoconnect=1&resize=scale", encoding="utf-8")
         user_url = base_url.rstrip("/") + "/connect?key=" + quote(secret)
         summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
         summary = (
