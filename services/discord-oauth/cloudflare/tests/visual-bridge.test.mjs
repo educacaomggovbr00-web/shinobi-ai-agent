@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {generateKeyPairSync,createSign} from "node:crypto";
 import worker from "../src/worker.mjs";
-import {verifyGitHubOidc,validateMobileAction,visualRunner,visualMobile} from "../src/visual-bridge.mjs";
+import {verifyGitHubOidc,validateMobileAction,visualRunner,visualMobile,visualTakeover} from "../src/visual-bridge.mjs";
 
 const origin="https://bushin-cloudflare-visual-tests.workers.dev";
 const owner="123456789012345678";
@@ -70,7 +70,10 @@ class FakeD1{
        const item=db.sessions.get(args[0]);
        return item&&item.token_hash===args[1]&&item.expires_at>args[2]?item:null;
       }
-      if(sql.startsWith("SELECT COUNT(*) AS total FROM bushin_visual_commands"))
+         if(sql.startsWith("SELECT takeover_encrypted FROM bushin_visual_sessions")){
+        return [...db.sessions.values()].find(x=>x.owner_id===args[0]&&x.expires_at>args[1]&&x.last_seen>args[2]&&x.takeover_encrypted)||null;
+      }
+   if(sql.startsWith("SELECT COUNT(*) AS total FROM bushin_visual_commands"))
        return {total:[...db.commands.values()].filter(x=>x.run_id===args[0]&&x.owner_id===args[1]&&["queued","in_progress"].includes(x.state)).length};
       if(sql.startsWith("SELECT * FROM bushin_visual_commands")){
        return [...db.commands.values()].find(x=>x.run_id===args[0]&&x.owner_id===args[1]&&x.state==="queued")||null;
@@ -88,6 +91,8 @@ class FakeD1{
         db.sessions.set(args[0],{run_id:args[0],owner_id:args[1],token_hash:args[2],created_at:args[3],expires_at:args[4],last_seen:args[5]});
       }else if(sql.startsWith("UPDATE bushin_visual_sessions")){
         const s=db.sessions.get(args[1]);s.last_seen=args[0];
+      }else if(sql.startsWith("UPDATE bushin_visual_sessions SET takeover_encrypted")){
+        const row=db.sessions.get(args[1]);row.takeover_encrypted=args[0];
       }else if(sql.startsWith("INSERT INTO bushin_visual_commands")){
         db.commands.set(args[0],{id:args[0],run_id:args[1],owner_id:args[2],action:args[3],
           args_json:args[4],state:args[5],result_json:null,created_at:args[6],updated_at:args[7]});
@@ -129,13 +134,31 @@ test("Signed GitHub Actions OIDC safely registers runner, exchanges one private 
  const req=(path,options={})=>new Request(origin+path,{
    ...options,headers:{authorization:"Bearer "+data.runner_token,...(options.headers||{})}
  });
+ const takeoverUrl="https://bushin-test-private.trycloudflare.com/connect?key="+"A".repeat(45);
+ const sealed=async value=>"ciphertext."+Buffer.from(value).toString("base64url");
+ const unseal=async value=>Buffer.from(value.slice("ciphertext.".length),"base64url").toString();
+ const submitted=await visualRunner(req("/bridge/runner/takeover?run_id="+runId,{
+   method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:takeoverUrl})
+ }),env,{seal:sealed});
+ assert.equal((await submitted.json()).secured,true);
+ assert.ok(!JSON.stringify([...db.sessions.values()]).includes(takeoverUrl));
+ const unauthorized=await visualRunner(new Request(origin+"/bridge/runner/takeover?run_id="+runId,{
+   method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:takeoverUrl})
+ }),env,{seal:sealed});
+ assert.equal(unauthorized.status,401);
  const html=async(title,content)=>new Response("<h1>"+title+"</h1>"+content,{headers:{"content-type":"text/html"}});
  const page=async(a,b)=>html(a,b);
  const redirect=to=>new Response(null,{status:303,headers:{location:to}});
  const mobile={ownerId:owner,escape:String,page,redirect,base:origin};
  let view=await visualMobile(new Request(origin+"/mobile/visual"),env,mobile);
  assert.equal(view.status,200);
- assert.match(await view.text(),/Navegador temporário conectado/);
+ const ownerHtml=await view.text();
+ assert.match(ownerHtml,/Navegador temporário conectado/);
+ assert.match(ownerHtml,/Assumir navegador visual/);
+ const takeoverRedirect=await visualTakeover(new Request(origin+"/mobile/visual/takeover"),env,
+   {ownerId:owner,unseal,redirect});
+ assert.equal(takeoverRedirect.status,303);
+ assert.equal(takeoverRedirect.headers.get("location"),takeoverUrl);
  const queued=await visualMobile(new Request(origin+"/mobile/visual",{
    method:"POST",headers:{"content-type":"application/x-www-form-urlencoded","origin":origin},
    body:new URLSearchParams({action:"rpg_view"})
