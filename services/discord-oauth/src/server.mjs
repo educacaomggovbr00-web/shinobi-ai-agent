@@ -20,7 +20,10 @@ import {CHANNELS,GUILD,safeBrowserAction,browserStatus,
 import {configureOAuth,metadata,registerOAuthClient,beginAuthorize,discordCallback,
   exchangeOAuthToken,resolveOAuthAccess,oauthErrorBody,oauthStatus} from "./oauth-bridge.mjs";
 
-const publicBase=process.env.PUBLIC_BASE_URL?.replace(/\/$/,"");
+const renderHost=process.env.RENDER_EXTERNAL_HOSTNAME||"";
+const configuredBase=process.env.PUBLIC_BASE_URL||
+  (/^[a-z0-9.-]+\.onrender\.com$/i.test(renderHost)?"https://"+renderHost:"");
+const publicBase=configuredBase.replace(/\/$/,"");
 const ownerId=process.env.BUSHIN_OWNER_DISCORD_ID||"";
 const discordSecret=process.env.DISCORD_CLIENT_SECRET||"";
 const port=Number(process.env.PORT||3000);
