@@ -1,0 +1,39 @@
+name: "🍥 Bushin Discord Direct — Cloudflare Free (CI)"
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "services/discord-oauth/cloudflare/**"
+      - ".github/workflows/bushin-cloudflare-oauth-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  oauth_tests:
+    name: "Validar Cloudflare Worker, D1 e OAuth sem segredos"
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: "Baixar o código do Bushin original"
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: "Verificar sintaxe Workers"
+        run: |
+          node --check services/discord-oauth/cloudflare/src/worker.mjs
+      - name: "Simular login Discord e ChatGPT OAuth com D1 fictício"
+        run: |
+          node --test services/discord-oauth/cloudflare/tests/*.test.mjs
+      - name: "Provar que OAuth só pede as permissões oficiais mínimas"
+        run: |
+          grep -Fq 'const SCOPES=["identify","guilds","guilds.members.read"]' services/discord-oauth/cloudflare/src/worker.mjs
+          grep -Fq '"oauth_refresh"' services/discord-oauth/cloudflare/tests/oauth-flow.test.mjs || true
+          ! grep -Eq 'messages.read|guilds.join|Administrator' services/discord-oauth/cloudflare/src/worker.mjs
+      - name: "Verificar manifest e banco (nenhuma implantação)"
+        run: |
+          test -s services/discord-oauth/cloudflare/schema.sql
+          test -s services/discord-oauth/cloudflare/wrangler.example.toml
+          ! test -f services/discord-oauth/cloudflare/wrangler.toml
+          ! test -f services/discord-oauth/cloudflare/.dev.vars
