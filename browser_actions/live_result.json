@@ -1,14 +1,11 @@
 {
-  "id": "bushin-gallery-guides-39188253738-18",
+  "id": "bushin-scan-server-39188253738-19",
   "session_id": "39188253738",
-  "action": "screenshot",
+  "action": "scroll",
   "ok": true,
   "data": {
-    "artifact_id": 12160313601,
-    "artifact_name": "bushin-snapshot-39188253738-f106d300bc6d41",
-    "retention_days": 1,
-    "visible_page": "https://discord.com/channels/1515877468299595919/1544461080624111716",
-    "note": "Private Actions artifact only; request its download to show the JPEG in ChatGPT."
+    "scroll_pixels": -1020,
+    "url": "https://discord.com/channels/1515877468299595919/1544461080624111716"
   },
-  "finished_at_utc": "2026-10-19T03:09:49.658526+00:00"
+  "finished_at_utc": "2026-10-19T03:10:08.397250+00:00"
 }
