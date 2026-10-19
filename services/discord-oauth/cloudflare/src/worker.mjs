@@ -310,12 +310,71 @@ async function mcp(req,env){
   }
   return rpcError(id,-32601,"Method not found");
 }
+
+/* Mobile-only browser OAuth portal; no MCP client is needed. */
+const MOBILE_CSS="body{background:#0b1020;color:#e8f1ff;font:16px system-ui;margin:0;padding:28px 18px}main{max-width:480px;margin:20px auto}.card{border:1px solid #384666;background:#152039;border-radius:20px;padding:24px;margin:28px 0}h1{font-size:32px}p{line-height:1.6;color:#c1d0e9}.button{display:block;background:#5865f2;color:white;text-decoration:none;border:0;border-radius:14px;padding:17px;text-align:center;font-size:17px;font-weight:800;width:100%;box-sizing:border-box;margin-top:20px}.muted{font-size:13px;color:#a5b6d3}.ok{color:#80e5b3}.user{font-size:24px;font-weight:800;overflow-wrap:anywhere}";
+const M_FLOW="__Host-bushin_flow",M_SESSION="__Host-bushin_mobile";
+function mCookie(req,name){for(const pair of (req.headers.get("cookie")||"").split(";")){const s=pair.trim();if(s.startsWith(name+"="))return s.slice(name.length+1)}return ""}
+function mSet(name,value,age){return name+"="+value+"; Secure; HttpOnly; SameSite=Lax; Path=/; Max-Age="+age}
+function mEsc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function mPage(title,content){
+ const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bushin — Discord no celular</title><style>'+MOBILE_CSS+'</style><main><div style="font-size:48px">🍥</div><h1>'+title+'</h1><p>Conexão do Discord para Android. Não precisa de Linux.</p><div class="card">'+content+'</div><p class="muted">Login oficial do Discord: identify, guilds, guilds.members.read. Sem leitura de mensagens ou DMs. Esta página não habilita automaticamente as ferramentas MCP no aplicativo ChatGPT.</p></main></html>';
+ return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'","referrer-policy":"no-referrer","x-content-type-options":"nosniff","x-frame-options":"DENY"}});
+}
+function mGo(to,cookies=[]){const h=new Headers({"location":to,"cache-control":"no-store","referrer-policy":"no-referrer"});for(const c of cookies)h.append("set-cookie",c);return new Response(null,{status:303,headers:h})}
+async function mobileHome(req,env){
+ ready(env);
+ if(new URL(req.url).searchParams.get("error"))return mPage("Não conectou",'<p>A autorização falhou ou foi cancelada. Confira se você está usando sua conta do Naruto Project RP.</p><a class="button" href="/mobile/start">Tentar novamente</a>');
+ const raw=mCookie(req,M_SESSION);
+ if(/^[A-Za-z0-9_-]{40,80}$/.test(raw)){
+   const row=await q(env,"SELECT * FROM mobile_user_sessions WHERE token_hash=? AND expires_at>?",await digest(raw),now()).first();
+   if(row?.user_id===env.BUSHIN_OWNER_DISCORD_ID){
+     try{const c=await unseal(row.creds_encrypted,env);if(c.expires>now()+30000){
+       const me=await verified(env,c);
+       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
+     }}catch{}
+   }
+ }
+ return mPage("Bushin no celular",'<p>Toque para autorizar a sua conta na página oficial do Discord.</p><a class="button" href="/mobile/start">Conectar com Discord</a><p class="muted">Não informe sua senha nesta página.</p>');
+}
+async function mobileStart(req,env){
+ const b=ready(env),state="mobile."+rnd(),verifier=rnd()+rnd().slice(0,12);
+ await q(env,"DELETE FROM mobile_oauth_flows WHERE expires_at<?",now()).run();
+ await q(env,"INSERT INTO mobile_oauth_flows (state_hash,discord_verifier,expires_at) VALUES (?,?,?)",await digest(state),verifier,now()+10*minute).run();
+ const u=new URL("https://discord.com/oauth2/authorize");
+ for(const [k,v] of Object.entries({client_id:DISCORD_CLIENT_ID,redirect_uri:b+"/oauth/discord/callback",response_type:"code",scope:SCOPES.join(" "),state,code_challenge_method:"S256",code_challenge:await digest(verifier),prompt:"consent"}))u.searchParams.set(k,v);
+ return mGo(u.toString(),[mSet(M_FLOW,state,600)]);
+}
+async function mobileCallback(req,env){
+ const b=ready(env),p=new URL(req.url).searchParams,state=p.get("state")||"";
+ if(!/^mobile\.[A-Za-z0-9_-]{40,80}$/.test(state)||mCookie(req,M_FLOW)!==state)return mGo("/mobile?error=state");
+ const row=await q(env,"DELETE FROM mobile_oauth_flows WHERE state_hash=? AND expires_at>? RETURNING *",await digest(state),now()).first();
+ if(!row||!p.get("code")||p.get("error")||(p.get("iss")&&p.get("iss")!=="https://discord.com"))return mGo("/mobile?error=denied",[mSet(M_FLOW,"",0)]);
+ try{
+   const creds=await discordToken(env,{grant_type:"authorization_code",code:p.get("code"),redirect_uri:b+"/oauth/discord/callback",code_verifier:row.discord_verifier});
+   const profile=await verified(env,creds),session=rnd()+rnd().slice(0,12),until=Math.min(now()+12*60*minute,creds.expires-30000);
+   if(until<=now())throw Error("Expired login");
+   await q(env,"INSERT INTO mobile_user_sessions (token_hash,user_id,creds_encrypted,expires_at) VALUES (?,?,?,?)",await digest(session),profile.id,await seal(creds,env),until).run();
+   return mGo("/mobile",[mSet(M_FLOW,"",0),mSet(M_SESSION,session,Math.floor((until-now())/1000))]);
+ }catch{return mGo("/mobile?error=denied",[mSet(M_FLOW,"",0)]);}
+}
+async function mobileLogout(req,env){
+ if(req.headers.get("origin")!==ready(env))return reply({error:"Invalid origin"},403);
+ const session=mCookie(req,M_SESSION);
+ if(/^[A-Za-z0-9_-]{40,80}$/.test(session))await q(env,"DELETE FROM mobile_user_sessions WHERE token_hash=?",await digest(session)).run();
+ return mGo("/mobile",[mSet(M_SESSION,"",0)]);
+}
+
 export default {
   async fetch(req,env){
     const path=new URL(req.url).pathname;
     try{
       const b=base(env);
       if(new URL(req.url).origin!==b)return reply({error:"Unrecognized host"},403);
+      if((path==="/"||path==="/mobile")&&req.method==="GET")return await mobileHome(req,env);
+      if(path==="/mobile/start"&&req.method==="GET")return await mobileStart(req,env);
+      if(path==="/mobile/logout"&&req.method==="POST")return await mobileLogout(req,env);
+      if(path==="/oauth/discord/callback"&&req.method==="GET"&&new URL(req.url).searchParams.get("state")?.startsWith("mobile."))return await mobileCallback(req,env);
       if(path==="/health"&&req.method==="GET")return reply({
         app:"Bushin Browser — Discord Direct (Cloudflare)",client_id:DISCORD_CLIENT_ID,
         connected:false,login_required:true,backend:"cloudflare-workers",
