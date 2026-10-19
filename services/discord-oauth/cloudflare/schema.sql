@@ -92,3 +92,30 @@ CREATE TABLE IF NOT EXISTS bushin_project_state (
  updated_at INTEGER NOT NULL,
  PRIMARY KEY(owner_id,key)
 );
+
+-- Visual bridge: ephemeral OIDC-enrolled GitHub runner, owner-only command queue.
+CREATE TABLE IF NOT EXISTS bushin_visual_jti (
+ jti_hash TEXT PRIMARY KEY,
+ expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS bushin_visual_sessions (
+ run_id TEXT PRIMARY KEY,
+ owner_id TEXT NOT NULL,
+ token_hash TEXT NOT NULL,
+ created_at INTEGER NOT NULL,
+ expires_at INTEGER NOT NULL,
+ last_seen INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visual_owner ON bushin_visual_sessions(owner_id,created_at);
+CREATE TABLE IF NOT EXISTS bushin_visual_commands (
+ id TEXT PRIMARY KEY,
+ run_id TEXT NOT NULL,
+ owner_id TEXT NOT NULL,
+ action TEXT NOT NULL,
+ args_json TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('queued','in_progress','completed','failed')),
+ result_json TEXT,
+ created_at INTEGER NOT NULL,
+ updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_visual_commands_lookup ON bushin_visual_commands(run_id,owner_id,state,created_at);
