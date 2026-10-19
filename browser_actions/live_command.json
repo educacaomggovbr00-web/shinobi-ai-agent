@@ -1,5 +1,6 @@
 {
-  "id": "bushin-live-confirm-39184315765-20261019-01",
+  "id": "bushin-test-open-rp-39184315765-02",
   "session_id": "39184315765",
-  "action": "status"
+  "action": "open_url",
+  "url": "https://discord.com/channels/1515877468299595919/1520116350360617154"
 }
