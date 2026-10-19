@@ -92,7 +92,7 @@ function validate(action, args) {
     c.x=args.x;c.y=args.y;return c;
   }
   if (action==="press") {
-    if (!["Escape","Tab","Shift+Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","PageUp","PageDown","Home","End"].includes(args.key))
+    if (!["Escape","Enter","Tab","Shift+Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","PageUp","PageDown","Home","End"].includes(args.key))
       throw Error("Tecla não permitida.");
     c.key=args.key;return c;
   }
