@@ -1,8 +1,12 @@
 {
-  "id": "bushin-status-39182819799-20261019-06",
-  "session_id": "39182819799",
+  "id": "bushin-v16-status-39187756275-01",
+  "session_id": "39187756275",
   "action": "status",
-  "ok": false,
-  "error": "BrowserType.connect_over_cdp: connect ECONNREFUSED 127.0.0.1:9222\nCall log:\n  - <ws preparing> retrieving websocket url from http://127.0.0.1:9222\n",
-  "finished_at_utc": "2026-10-19T01:38:05.786199+00:00"
+  "ok": true,
+  "data": {
+    "online": true,
+    "url": "https://discord.com/login",
+    "title": "Discord"
+  },
+  "finished_at_utc": "2026-10-19T02:00:35.377573+00:00"
 }
