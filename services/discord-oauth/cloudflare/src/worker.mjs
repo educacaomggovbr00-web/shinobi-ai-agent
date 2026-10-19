@@ -458,7 +458,7 @@ async function mobileFeatures(req,env){
  '<p class="muted">'+(dmConfigured?'O token do bot está configurado. A entrega de DM ainda depende das permissões do Discord e de uma confirmação explícita.':'A DM do bot para o proprietário verificado não exige administrar o Naruto RP, mas precisa de um bot próprio e do segredo DISCORD_BOT_TOKEN na Cloudflare.')+'</p>'+
  '<p class="muted">Configure apenas pela interface segura, nunca envie Bot Token no chat.</p>'+
  '<a href="https://discord.com/developers/applications/1561589128108314636/bot">Abrir Bot no Discord Developer Portal</a></details>';
- const note=dmNote+'<p class="muted">OAuth identifica você e libera a solicitação de comandos pessoais. Não permite enviar mensagens como conta de usuário. As ferramentas MCP continuam indisponíveis no aplicativo ChatGPT Android enquanto o plugin original não estiver instalado/conectado.</p>';
+ const note=dmNote+'<p class="muted">OAuth identifica você e libera a solicitação de comandos pessoais. Não permite enviar mensagens como conta de usuário. O modo Android permanece skill-only. As ferramentas MCP continuam indisponíveis no aplicativo ChatGPT Android enquanto o plugin original não estiver instalado/conectado.</p>';
  return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
 }
 
