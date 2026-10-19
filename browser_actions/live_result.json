@@ -1,14 +1,14 @@
 {
-  "id": "bushin-fichas-open-39188253738-21",
+  "id": "bushin-gallery-chat-click-39188253738-22",
   "session_id": "39188253738",
   "action": "click",
   "ok": true,
   "data": {
     "clicked": [
       223,
-      5
+      147
     ],
-    "url": "https://discord.com/channels/1515877468299595919/1544461080624111716"
+    "url": "https://discord.com/channels/1515877468299595919/1520114256740352061"
   },
-  "finished_at_utc": "2026-10-19T03:10:45.135335+00:00"
+  "finished_at_utc": "2026-10-19T03:11:03.890102+00:00"
 }
