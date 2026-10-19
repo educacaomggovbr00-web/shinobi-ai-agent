@@ -20,6 +20,40 @@ VNC_DIR = "/usr/share/novnc"
 LOGIN_URL = "https://discord.com/login?redirect_to=%2Fstore"
 MAX_SECONDS = 345 * 60
 
+LOGIN_HTML = """<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bushin — acesso protegido</title>
+  <style>
+    body { background:#0d1425; color:#f5f6fb; font:16px system-ui,sans-serif; margin:0; min-height:100vh; display:grid; place-items:center; }
+    main { box-sizing:border-box; width:min(420px,calc(100vw - 32px)); padding:28px; border:1px solid #334155; border-radius:16px; background:#182234; }
+    h1 { font-size:1.5rem; margin:0 0 14px; } p { line-height:1.55; color:#cbd5e1; }
+    label { display:block; font-weight:600; margin:18px 0 8px; }
+    input { box-sizing:border-box; width:100%; padding:12px; border-radius:8px; border:1px solid #64748b; background:#0d1425; color:white; }
+    button { margin-top:16px; width:100%; padding:13px; border:0; border-radius:8px; background:#f97316; color:#111827; font-weight:700; cursor:pointer; }
+    small { display:block; margin-top:18px; color:#94a3b8; line-height:1.5; }
+  </style>
+</head>
+<body><main>
+  <h1>🍥 Bushin Linux — entrada segura</h1>
+  <p>O visualizador está disponível pela internet, mas o desktop só abre após autenticação.</p>
+  <form method="post" action="/login">
+    <label for="access_key">Chave de acesso da execução</label>
+    <input id="access_key" name="access_key" type="password" required autocomplete="off" autofocus>
+    <button type="submit">Entrar no desktop</button>
+  </form>
+  <small>Você também pode abrir o link privado no resumo da execução do GitHub Actions para entrar automaticamente. Não compartilhe a chave.</small>
+</main></body></html>"""
+
+LOGIN_HEADERS = {
+    "Cache-Control": "no-store, private",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+}
+
 def safe_equal(left, right):
     return isinstance(left, str) and hmac.compare_digest(left.encode(), right.encode())
 
@@ -27,19 +61,39 @@ def make_app(secret):
     app = web.Application(client_max_size=1024 * 1024)
     app["secret"] = secret
 
+    def authenticated_redirect():
+        response = web.HTTPFound("/vnc.html?autoconnect=1&resize=scale")
+        response.set_cookie(
+            "bushin_session", secret, max_age=MAX_SECONDS,
+            secure=True, httponly=True, samesite="Lax", path="/")
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
+
     async def handler(request):
-        if request.path == "/connect":
+        if request.path == "/connect" and request.method == "GET":
             supplied = request.query.get("key", "")
             if not safe_equal(supplied, secret):
-                return web.Response(status=403, text="Acesso negado")
-            response = web.HTTPFound("/vnc.html?autoconnect=1&resize=scale")
-            response.set_cookie(
-                "bushin_session", secret, max_age=MAX_SECONDS,
-                secure=True, httponly=True, samesite="Lax", path="/")
-            return response
+                return web.Response(status=403, text="Acesso negado", headers=LOGIN_HEADERS)
+            return authenticated_redirect()
+
+        if request.path == "/login" and request.method == "POST":
+            # Origin prevents another website from silently submitting a login.
+            if request.headers.get("Origin") != "https://" + request.host:
+                return web.Response(status=403, text="Origem nao autorizada", headers=LOGIN_HEADERS)
+            form = await request.post()
+            if not safe_equal(form.get("access_key", ""), secret):
+                return web.Response(status=403, text="Chave invalida", headers=LOGIN_HEADERS)
+            return authenticated_redirect()
 
         if not safe_equal(request.cookies.get("bushin_session", ""), secret):
-            return web.Response(status=403, text="Use o link privado da execucao no GitHub Actions.")
+            # Public landing page ONLY. No VNC assets, WebSocket or desktop pixels
+            # are served without the private per-run secret.
+            if request.method == "GET" and request.path in ("/", "/vnc.html"):
+                return web.Response(text=LOGIN_HTML, content_type="text/html",
+                                    headers=LOGIN_HEADERS)
+            return web.Response(status=403, text="Autenticacao obrigatoria",
+                                headers=LOGIN_HEADERS)
 
         if request.path == "/":
             raise web.HTTPFound("/vnc.html?autoconnect=1&resize=scale")
