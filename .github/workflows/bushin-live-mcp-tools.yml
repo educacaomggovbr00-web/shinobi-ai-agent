@@ -31,10 +31,10 @@ jobs:
             signal:AbortSignal.timeout(14000)
           });
           assert.equal(browser.status,200,"Browser MCP link must not show Not Found");
-          assert.match(browser.headers.get("content-type")||"",/text\\/html/);
+          assert.ok((browser.headers.get("content-type")||"").includes("text/html"));
           const browserHtml=await browser.text();
           assert.match(browserHtml,/API para clientes MCP/);
-          assert.match(browserHtml,/href="\\/mobile"/);
+          assert.ok(browserHtml.includes('href="/mobile"'));
           const machineGet=await fetch(url,{
             method:"GET",headers:{accept:"text/event-stream"},
             signal:AbortSignal.timeout(14000)
