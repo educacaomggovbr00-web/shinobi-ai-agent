@@ -327,6 +327,10 @@ const TOOLS=[
    securitySchemes:[{type:"oauth2",scopes:SCOPES}],
    _meta:{"openai/profile":true},
    annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
+ {name:"bushin_session_status",title:"Status da conexão Bushin",
+   description:"Confirma se este cliente MCP autorizou a própria conta Discord, informa permissões realmente disponíveis e distingue conexão MCP de sessão do navegador. Não usa Linux, bot nem envia mensagens.",
+   inputSchema:{type:"object",properties:{},additionalProperties:false},
+   annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
  {name:"bushin_discord_whoami",title:"Verificar conta Discord",
    description:"Discord OAuth oficial: informa somente a conta autenticada; sem e-mail, DMs ou mensagens.",
    inputSchema:{type:"object",properties:{},additionalProperties:false},
@@ -361,6 +365,16 @@ async function mcp(req,env){
     try{
       const me=await verified(env,auth.creds);
       const data=name==="bushin_discord_profile"?discordProfileData(me):
+        name==="bushin_session_status"?{
+          state:"connected",mcp_oauth_authenticated:true,
+          discord_account:{id:me.id,username:me.username,display_name:me.display_name},
+          member_naruto_rp:me.membership?.member===true,
+          granted_scopes:auth.record.scope.split(/\\s+/).filter(Boolean),
+          available:{identity:true,server_list:true,naruto_membership:true,
+            channel_messages_as_user:false,send_as_user:false},
+          requires_linux_for_identity:false,
+          note:"OAuth autentica este cliente MCP. Não confirma instalação do plugin no ChatGPT Android nem dá controle da conta pessoal para enviar mensagens."
+        }:
         ADVANCED_NAMES.has(name)?await advancedCall(env,name,body.params?.arguments||{},{me,creds:auth.creds}):
         BROWSER_TOOLS.some(t=>t.name===name)?await browserCall(env,name,body.params?.arguments||{}):
         BOT_TOOLS.some(t=>t.name===name)?await botCall(env,name,body.params?.arguments||{}):
