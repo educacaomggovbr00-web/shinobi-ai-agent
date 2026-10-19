@@ -1,11 +1,12 @@
 {
-  "id": "retry-open-discord-login-39178166963-003",
+  "id": "bushin-chat-panel-login-check-20261018-004",
   "session_id": "39178166963",
-  "action": "open_url",
+  "action": "status",
   "ok": true,
   "data": {
+    "online": true,
     "url": "https://discord.com/login",
     "title": "Discord"
   },
-  "finished_at_utc": "2026-10-19T00:05:58.793709+00:00"
+  "finished_at_utc": "2026-10-19T00:19:19.992500+00:00"
 }
