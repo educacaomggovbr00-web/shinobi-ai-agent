@@ -254,7 +254,7 @@ async def perform(action, command):
             if action == "status":
                 public_url_file = Path("/tmp/bushin-public-origin")
                 public_url = public_url_file.read_text(encoding="utf-8").strip() if public_url_file.is_file() else ""
-                if not re.fullmatch(r"https://[a-zA-Z0-9-]+\\.trycloudflare\\.com/vnc\\.html\\?autoconnect=1&resize=scale", public_url):
+                if not re.fullmatch(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com/vnc\.html\?autoconnect=1&resize=scale", public_url):
                     public_url = ""
                 return {"online": True, "url": current_url, "title": (await page.title())[:180], "public_entry_url": public_url}
             if action == "open_url":
