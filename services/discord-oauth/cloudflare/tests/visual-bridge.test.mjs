@@ -89,10 +89,10 @@ class FakeD1{
       if(sql.startsWith("INSERT INTO bushin_visual_jti"))db.jtis.add(args[0]);
       else if(sql.startsWith("INSERT INTO bushin_visual_sessions")){
         db.sessions.set(args[0],{run_id:args[0],owner_id:args[1],token_hash:args[2],created_at:args[3],expires_at:args[4],last_seen:args[5]});
-      }else if(sql.startsWith("UPDATE bushin_visual_sessions")){
-        const s=db.sessions.get(args[1]);s.last_seen=args[0];
       }else if(sql.startsWith("UPDATE bushin_visual_sessions SET takeover_encrypted")){
         const row=db.sessions.get(args[1]);row.takeover_encrypted=args[0];
+      }else if(sql.startsWith("UPDATE bushin_visual_sessions SET last_seen")){
+        const s=db.sessions.get(args[1]);s.last_seen=args[0];
       }else if(sql.startsWith("INSERT INTO bushin_visual_commands")){
         db.commands.set(args[0],{id:args[0],run_id:args[1],owner_id:args[2],action:args[3],
           args_json:args[4],state:args[5],result_json:null,created_at:args[6],updated_at:args[7]});
@@ -141,6 +141,7 @@ test("Signed GitHub Actions OIDC safely registers runner, exchanges one private 
    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:takeoverUrl})
  }),env,{seal:sealed});
  assert.equal((await submitted.json()).secured,true);
+ assert.equal(typeof db.sessions.get(runId).last_seen,"number","takeover must not overwrite runner heartbeat");
  assert.ok(!JSON.stringify([...db.sessions.values()]).includes(takeoverUrl));
  const unauthorized=await visualRunner(new Request(origin+"/bridge/runner/takeover?run_id="+runId,{
    method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({url:takeoverUrl})
