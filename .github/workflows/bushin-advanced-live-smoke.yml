@@ -1,0 +1,57 @@
+name: "🍥 Bushin Advanced — verificar Cloudflare pública"
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/bushin-advanced-live-smoke.yml"
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: "Conferir ferramentas registradas e acesso sem login"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Smoke test público sem credenciais"
+        shell: bash
+        env:
+          BUSHIN_ORIGIN: "https://bushin-discord-direct.henrique-silva081106.workers.dev"
+        run: |
+          python - <<'PY'
+          import json,os,urllib.request,urllib.error
+          base=os.environ['BUSHIN_ORIGIN']
+          def request(path,method="GET",body=None,headers=None):
+              data=json.dumps(body).encode() if body is not None else None
+              req=urllib.request.Request(base+path,data=data,method=method,headers=headers or {})
+              if body is not None:req.add_header("Content-Type","application/json")
+              try:
+                  with urllib.request.urlopen(req,timeout=15) as r:
+                      return r.status,r.headers, r.read()
+              except urllib.error.HTTPError as e:
+                  return e.code,e.headers,e.read()
+          code,_,data=request("/health")
+          assert code==200,code
+          health=json.loads(data)
+          assert health["configuration_ready"] is True
+          assert health["no_github_dependency"] is True
+          code,_,_=request("/mobile")
+          assert code==200,code
+          body={"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}
+          code,_,data=request("/mcp","POST",body)
+          assert code==200,code
+          tools=json.loads(data)["result"]["tools"]
+          names={x["name"] for x in tools}
+          required={"bushin_browser_tabs","bushin_discord_list_servers",
+             "bushin_task_start","bushin_task_status","bushin_files_list",
+             "bushin_github_read_repo","bushin_save_state","bushin_auth_status",
+             "bushin_ui_live_panel","bushin_permissions_check"}
+          assert required<=names, sorted(required-names)
+          assert len(names)==len(tools), "Tool name collision"
+          code,_,_=request("/mcp","POST",{"jsonrpc":"2.0","id":2,"method":"tools/call",
+              "params":{"name":"bushin_task_start","arguments":{"title":"no auth"}}})
+          assert code==401,code
+          print("Bushin:",len(names),"ferramentas MCP no servidor; sem acesso a contas sem OAuth")
+          PY
