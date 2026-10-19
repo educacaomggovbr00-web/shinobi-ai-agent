@@ -1,5 +1,6 @@
 {
-  "id": "bushin-public-check-39188253738-01",
+  "id": "bushin-rpg-status-39188253738-02",
   "session_id": "39188253738",
-  "action": "status"
+  "action": "open_url",
+  "url": "https://discord.com/channels/1515877468299595919/1520116350360617154"
 }
