@@ -91,6 +91,31 @@ test("Owner can render dashboard, create task, pause/resume and save progress",a
  assert.equal(JSON.parse(db.mem.get("naruto_progress")),"Genin, buscando equipe");
  assert.ok(db.events.length>=4);
 });
+test("Android workspace POST works with same-origin Referer and no Origin",async()=>{
+ const {req,db}=instance();
+ const result=await req("/mobile/workspace",{
+  method:"POST",
+  headers:{referer:base+"/mobile/workspace","content-type":"application/x-www-form-urlencoded"},
+  body:new URLSearchParams({op:"create",title:"Teste Android",description:"Somente tarefa"})
+ });
+ assert.equal(result.status,200);
+ assert.equal(db.tasks.size,1);
+ assert.match(await result.text(),/Teste Android/);
+});
+test("Workspace rejects missing provenance and mismatched Origin even with trusted Referer",async()=>{
+ const {req,db}=instance();
+ for(const headers of [
+   {"content-type":"application/x-www-form-urlencoded"},
+   {origin:"https://attacker.example",referer:base+"/mobile/workspace","content-type":"application/x-www-form-urlencoded"},
+   {referer:"https://attacker.example/mobile/workspace","content-type":"application/x-www-form-urlencoded"}
+ ]) {
+   const response=await req("/mobile/workspace",{
+     method:"POST",headers,body:new URLSearchParams({op:"create",title:"Não criar"})
+   });
+   assert.equal(response.status,403);
+ }
+ assert.equal(db.tasks.size,0);
+});
 test("Cross-origin CSRF, unauthenticated task posts and unknown actions are denied",async()=>{
  const {req,db,env}=instance();
  const hostile=await req("/mobile/workspace",form({op:"create",title:"Pwned"}, "https://attacker.test"));
