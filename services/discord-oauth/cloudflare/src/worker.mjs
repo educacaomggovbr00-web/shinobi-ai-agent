@@ -150,11 +150,16 @@ export function classifyDiscordTokenFailure(status,code){
   return "discord_auth";
 }
 async function discordToken(env,data){
-  const basic=btoa(DISCORD_CLIENT_ID+":"+env.DISCORD_CLIENT_SECRET);
+  // Discord supports form-body client authentication for authorization_code
+  // and refresh_token grants. Nothing is logged or sent to the browser.
+  // Keep the Client Secret on the Worker, protected by the Cloudflare secret binding.
+  const form=new URLSearchParams(data);
+  form.set("client_id",DISCORD_CLIENT_ID);
+  form.set("client_secret",env.DISCORD_CLIENT_SECRET);
   const response=await fetch(DISCORD+"/oauth2/token",{
     method:"POST",
-    headers:{"authorization":"Basic "+basic,"content-type":"application/x-www-form-urlencoded","accept":"application/json"},
-    body:new URLSearchParams(data),
+    headers:{"content-type":"application/x-www-form-urlencoded","accept":"application/json"},
+    body:form,
     signal:AbortSignal.timeout(12000)
   });
   if(!response.ok){
