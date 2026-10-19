@@ -1,6 +1,9 @@
 name: "🍥 Bushin Visual — teste OIDC sem Discord"
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/bushin-oidc-bridge-smoke.yml"
 permissions:
   contents: read
   id-token: write
