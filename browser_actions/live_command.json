@@ -1,5 +1,6 @@
 {
-  "id": "bushin-v15-status-check-39184315765-20261019-02",
+  "id": "bushin-39184315765-open-rp-20261019-03",
   "session_id": "39184315765",
-  "action": "status"
+  "action": "open_url",
+  "url": "https://discord.com/channels/1515877468299595919/1520116350360617154"
 }
