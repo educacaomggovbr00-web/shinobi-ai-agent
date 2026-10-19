@@ -42,6 +42,21 @@ def validate_url(url):
         raise ValueError("Query string too long")
     return url
 
+def validate_gallery_urls(urls):
+    """Permit only 2-4 distinct text channels of the user's Naruto RP guild."""
+    if not isinstance(urls, list) or not 2 <= len(urls) <= 4:
+        raise ValueError("Gallery requires 2-4 authorized Naruto RP channel URLs")
+    normalized = []
+    for url in urls:
+        validate_url(url)
+        path = urlsplit(url).path
+        if not re.fullmatch(r"/channels/" + re.escape(GUILD_ID) + r"/[0-9]{15,22}", path):
+            raise ValueError("Gallery accepts only channels within Naruto Project RP")
+        if url in normalized:
+            raise ValueError("Duplicate gallery channel")
+        normalized.append(url)
+    return normalized
+
 def validate_command(command, run_id):
     if not isinstance(command, dict):
         raise ValueError("Command must be a JSON object")
@@ -51,10 +66,12 @@ def validate_command(command, run_id):
     if not isinstance(ident, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", ident):
         raise ValueError("Invalid command id")
     action = command.get("action")
-    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search"):
+    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot", "click", "press", "inspect_ui", "type_search", "capture_gallery"):
         raise ValueError("Unsupported action: use status, open_url, read_page_text, scroll, click_navigation or screenshot")
     if action == "open_url":
         validate_url(command.get("url"))
+    if action == "capture_gallery":
+        validate_gallery_urls(command.get("urls"))
     if action == "scroll":
         if command.get("direction", "down") not in ("up", "down"):
             raise ValueError("Invalid scroll direction")
@@ -251,6 +268,27 @@ async def perform(action, command):
                 return await safe_type_search(page, command["text"])
             if action == "screenshot":
                 return await publish_private_screenshot(page, command["session_id"])
+            if action == "capture_gallery":
+                # Explicit, prevalidated channels only; credentials and DMs remain blocked.
+                gallery_urls = validate_gallery_urls(command["urls"])
+                original_url = page.url
+                captured = []
+                try:
+                    for destination in gallery_urls:
+                        await page.goto(destination, wait_until="domcontentloaded", timeout=22000)
+                        await page.wait_for_timeout(550)
+                        captured.append(await publish_private_screenshot(page, command["session_id"]))
+                finally:
+                    # Preserve the user's channel after the screenshots, even on errors.
+                    parsed_original = urlsplit(original_url)
+                    if (parsed_original.hostname in ("discord.com", "www.discord.com")
+                            and parsed_original.path.startswith("/channels/" + GUILD_ID + "/")):
+                        try:
+                            await page.goto(original_url, wait_until="domcontentloaded", timeout=18000)
+                        except Exception:
+                            pass
+                return {"captures": captured, "count": len(captured),
+                        "note": "Private one-day GitHub artifacts; images must be downloaded and verified before display."}
             if action == "status":
                 public_url_file = Path("/tmp/bushin-public-origin")
                 public_url = public_url_file.read_text(encoding="utf-8").strip() if public_url_file.is_file() else ""
@@ -308,10 +346,11 @@ async def listen_commands():
                     and str(command.get("session_id", "")) == str(run_id)):
                 try:
                     action = validate_command(command, run_id)
-                    if action == "screenshot":
-                        if screenshot_count >= 6:
-                            raise ValueError("Screenshot limit reached (6 per Linux session)")
-                        screenshot_count += 1
+                    requested = (len(command["urls"]) if action == "capture_gallery"
+                                 else 1 if action == "screenshot" else 0)
+                    if screenshot_count + requested > 12:
+                        raise ValueError("Screenshot limit reached (12 per Linux session)")
+                    screenshot_count += requested
                     value = await perform(action, command)
                     result = {"id": current_id, "session_id": run_id,
                               "action": action, "ok": True, "data": value}
