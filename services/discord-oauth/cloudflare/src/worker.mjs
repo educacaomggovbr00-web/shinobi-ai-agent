@@ -667,7 +667,7 @@ async function mobilePersonalCommands(req,env){
      if(result.ok){
        const info=await result.json();
        const appId=String(info?.application?.id||"");
-       if(info?.user?.id===row.user_id&&/^\\d{15,22}$/.test(appId)){
+       if(info?.user?.id===row.user_id&&/^\d{15,22}$/.test(appId)){
          appMatches=appId===DISCORD_CLIENT_ID;
          status=appMatches?
            "O Discord confirmou que seu login pertence ao aplicativo "+String(info.application.name||"Bushin").slice(0,70)+" (ID "+appId+").":
