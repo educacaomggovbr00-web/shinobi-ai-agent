@@ -112,7 +112,7 @@ test("Only an authenticated mobile session can start the personal command instal
      }};
    }}
  };
- const consent=await worker.fetch(new Request(base+"/mobile/commands",{
+ const consent=await worker.fetch(new Request(base+"/mobile/commands/start",{
    headers:{cookie:"__Host-bushin_mobile="+token}
  }),env);
  assert.equal(consent.status,303);
@@ -145,4 +145,71 @@ test("Machine GET on MCP returns 405 and POST remains the advertised RPC method"
  assert.equal(response.status,405);
  assert.equal(response.headers.get("allow"),"POST");
  assert.deepEqual((await response.json()).error,"MCP requires POST");
+});
+
+
+test("Bushin diagnostics verify the real OAuth application without exposing its bearer token",async t=>{
+ const base="https://bushin-owner.workers.dev";
+ const session="s".repeat(52), owner="123456789012345678";
+ const encryptionKey=new Uint8Array(32).fill(16);
+ const imported=await crypto.subtle.importKey("raw",encryptionKey,"AES-GCM",false,["encrypt"]);
+ const iv=new Uint8Array(12).fill(4);
+ const access="do-not-ever-display-mock-bearer-token";
+ const ciphertext=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},imported,
+   new TextEncoder().encode(JSON.stringify({access,refresh:"fake-refresh",expires:Date.now()+2400000}))));
+ const encrypted=Buffer.from(iv).toString("base64url")+"."+Buffer.from(ciphertext).toString("base64url");
+ const hash=createHash("sha256").update(session).digest("base64url");
+ const env={
+   PUBLIC_BASE_URL:base,DISCORD_CLIENT_SECRET:"mock-only",ENCRYPTION_KEY_BASE64:Buffer.from(encryptionKey).toString("base64"),
+   BUSHIN_OWNER_DISCORD_ID:owner,DB:{prepare(sql){
+     assert.match(sql,/mobile_user_sessions/);
+     return {bind(value){assert.equal(value,hash);return {first:async()=>({user_id:owner,creds_encrypted:encrypted})}}};
+   }}
+ };
+ const original=globalThis.fetch;
+ t.after(()=>{globalThis.fetch=original});
+ globalThis.fetch=async (url,options)=>{
+   assert.equal(String(url),"https://discord.com/api/v10/oauth2/@me");
+   assert.equal(options.headers.authorization,"Bearer "+access);
+   return Response.json({application:{id:"1561589128108314636",name:"Bushin OAuth Test"},user:{id:owner},scopes:["identify"]});
+ };
+ const req=new Request(base+"/mobile/commands",{headers:{cookie:"__Host-bushin_mobile="+session}});
+ const res=await worker.fetch(req,env);
+ assert.equal(res.status,200);
+ const page=await res.text();
+ assert.match(page,/Bushin OAuth Test/);
+ assert.match(page,/User Install/);
+ assert.match(page,/applications.commands/);
+ assert.match(page,/\/mobile\/commands\/start/);
+ assert.match(page,/1561589128108314636/);
+ assert.doesNotMatch(page,/do-not-ever-display-mock-bearer-token/);
+ assert.equal(res.headers.get("cache-control"),"no-store");
+ globalThis.fetch=async()=>Response.json({application:{id:"123123123123123123",name:"Other App"},user:{id:owner},scopes:["identify"]});
+ const mismatch=await worker.fetch(req,env);
+ assert.equal(mismatch.status,200);
+ const warning=await mismatch.text();
+ assert.match(warning,/ATENÇÃO/);
+ assert.doesNotMatch(warning,/href="\/mobile\/commands\/start"/);
+});
+test("Bushin user-install diagnostics are private; expired or malformed credentials are not exposed",async()=>{
+ const base="https://bushin-owner.workers.dev",session="a".repeat(52);
+ const hashed=createHash("sha256").update(session).digest("base64url");
+ const env={
+   PUBLIC_BASE_URL:base,DISCORD_CLIENT_SECRET:"mock-only",ENCRYPTION_KEY_BASE64:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+   BUSHIN_OWNER_DISCORD_ID:"123456789012345678",
+   DB:{prepare(){return {bind(h){assert.equal(h,hashed);return {first:async()=>({
+     user_id:"123456789012345678",creds_encrypted:"never-expose-this-encrypted-text"
+   })}}}}}
+ };
+ const notLogged=await worker.fetch(new Request(base+"/mobile/commands"),env);
+ assert.equal(notLogged.status,303);
+ assert.equal(notLogged.headers.get("location"),"/mobile");
+ const diag=await worker.fetch(new Request(base+"/mobile/commands",{
+   headers:{cookie:"__Host-bushin_mobile="+session}
+ }),env);
+ assert.equal(diag.status,200);
+ const html=await diag.text();
+ assert.match(html,/Não foi possível verificar/);
+ assert.doesNotMatch(html,/never-expose-this-encrypted-text/);
+ assert.doesNotMatch(html,/href="\/mobile\/commands\/start"/);
 });
