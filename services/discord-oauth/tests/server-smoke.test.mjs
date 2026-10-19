@@ -19,7 +19,7 @@ async function retryFetch(url){
  }
  throw new Error("Bushin MCP server did not start in time");
 }
-test("Real MCP server boots, declares native visual tools and challenges OAuth",async()=>{
+test("Discord Direct MCP starts and exposes only Discord tools without GitHub",async()=>{
  const dir=fileURLToPath(new URL("../",import.meta.url));
  const p=await port();
  const server=spawn(process.execPath,["src/server.mjs"],{
@@ -34,6 +34,8 @@ test("Real MCP server boots, declares native visual tools and challenges OAuth",
    const health=await h.json();
    assert.equal(health.connected,false,"Health endpoint must not lie about OAuth status");
    assert.equal(health.login_required,true);
+   assert.equal(health.mode,"discord_direct");
+   assert.equal(health.requires_github_for_discord,false);
    const meta=await (await fetch("http://127.0.0.1:"+p+"/.well-known/oauth-protected-resource")).json();
    assert.equal(meta.resource,"https://bushin.example/mcp");
    assert.deepEqual(meta.authorization_servers,["https://bushin.example"]);
@@ -69,12 +71,48 @@ test("Real MCP server boots, declares native visual tools and challenges OAuth",
    const list=await req("tools/list",{},2);
    assert.equal(list.status,200);
    const body=await list.text();
-   assert.match(body,/bushin_browser_screenshot/);
-   assert.match(body,/bushin_open_browser_console/);
    assert.match(body,/bushin_discord_whoami/);
-   const unauth=await req("tools/call",{name:"bushin_browser_status",arguments:{}},3);
+   assert.match(body,/bushin_discord_naruto_membership/);
+   assert.doesNotMatch(body,/bushin_browser_screenshot/);
+   assert.doesNotMatch(body,/bushin_open_browser_console/);
+   assert.doesNotMatch(body,/bushin_browser_action/);
+   const unauth=await req("tools/call",{name:"bushin_discord_whoami",arguments:{}},3);
    assert.equal(unauth.status,401,"User data must require Discord OAuth");
    assert.match(unauth.headers.get("www-authenticate")||"",/resource_metadata=/);
+ }finally{
+   server.kill("SIGTERM");
+   await new Promise(resolve=>{server.once("exit",resolve);setTimeout(resolve,1500);});
+ }
+});
+
+test("Visual browser tools require explicit opt-in with hosting credential",async()=>{
+ const dir=fileURLToPath(new URL("../",import.meta.url));
+ const p=await port();
+ const server=spawn(process.execPath,["src/server.mjs"],{
+   cwd:dir,env:{...process.env,PORT:String(p),PUBLIC_BASE_URL:"https://bushin.example",
+     BUSHIN_OWNER_DISCORD_ID:"123456789012345678",
+     DISCORD_CLIENT_SECRET:"fake-secret-used-only-in-tests",
+     BUSHIN_ENABLE_BROWSER_BRIDGE:"1",
+     BUSHIN_GITHUB_TOKEN:"fake-private-github-credential-only-for-tests"},
+   stdio:["ignore","pipe","pipe"]
+ });
+ let stderr="";
+ server.stderr.on("data",x=>stderr+=String(x).slice(0,1200));
+ try{
+   const healthResp=await retryFetch("http://127.0.0.1:"+p+"/health");
+   assert.equal(healthResp.status,200,stderr);
+   const health=await healthResp.json();
+   assert.equal(health.mode,"discord_with_optional_browser");
+   const result=await fetch("http://127.0.0.1:"+p+"/mcp",{
+     method:"POST",
+     headers:{"content-type":"application/json","accept":"application/json, text/event-stream"},
+     body:JSON.stringify({jsonrpc:"2.0",id:2,method:"tools/list",params:{}})
+   });
+   assert.equal(result.status,200,await result.text().catch(()=>""));
+   const body=await result.text();
+   assert.match(body,/bushin_discord_whoami/);
+   assert.match(body,/bushin_browser_screenshot/);
+   assert.match(body,/bushin_open_browser_console/);
  }finally{
    server.kill("SIGTERM");
    await new Promise(resolve=>{server.once("exit",resolve);setTimeout(resolve,1500);});
