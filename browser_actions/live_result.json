@@ -1,12 +1,13 @@
 {
-  "id": "bushin-v16-status-39187756275-01",
-  "session_id": "39187756275",
+  "id": "bushin-public-check-39188253738-01",
+  "session_id": "39188253738",
   "action": "status",
   "ok": true,
   "data": {
     "online": true,
     "url": "https://discord.com/login",
-    "title": "Discord"
+    "title": "Discord",
+    "public_entry_url": "https://asking-determined-tracked-salvation.trycloudflare.com/vnc.html?autoconnect=1&resize=scale"
   },
-  "finished_at_utc": "2026-10-19T02:00:35.377573+00:00"
+  "finished_at_utc": "2026-10-19T02:06:25.869003+00:00"
 }
