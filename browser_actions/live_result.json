@@ -1,8 +1,12 @@
 {
-  "id": "bushin-work-control-probe-39182819799-a1",
-  "session_id": "39182819799",
+  "id": "bushin-v15-work-control-check-39184315765-01",
+  "session_id": "39184315765",
   "action": "status",
-  "ok": false,
-  "error": "BrowserType.connect_over_cdp: connect ECONNREFUSED 127.0.0.1:9222\nCall log:\n  - <ws preparing> retrieving websocket url from http://127.0.0.1:9222\n",
-  "finished_at_utc": "2026-10-19T01:06:14.953687+00:00"
+  "ok": true,
+  "data": {
+    "online": true,
+    "url": "https://discord.com/login",
+    "title": "Discord"
+  },
+  "finished_at_utc": "2026-10-19T01:14:42.791214+00:00"
 }
