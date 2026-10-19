@@ -1,5 +1,7 @@
 {
-  "id": "bushin-gallery-guides-39188253738-18",
+  "id": "bushin-scan-server-39188253738-19",
   "session_id": "39188253738",
-  "action": "screenshot"
+  "action": "scroll",
+  "direction": "up",
+  "amount": 6
 }
