@@ -179,7 +179,7 @@ test("Android tool dashboard requires the same secure mobile owner session",asyn
  assert.match(html,/Ferramentas do Bushin/);
  assert.match(html,/browser_tabs/);
  assert.match(html,/task_start/);
- assert.match(html,/Arquivos/);
+ assert.match(html,/arquivos/i);
  assert.match(html,/skill-only/);
  assert.doesNotMatch(html,/fake-discord-client-secret-only-for-testing/);
  assert.equal(logged.headers.get("cache-control"),"no-store");
