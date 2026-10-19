@@ -1,0 +1,23 @@
+# 🍥 Bushin Browser ORIGINAL — Discord Direct hosting (not a second ChatGPT plugin).
+# Creates exactly one free-tier Render web service using the existing MCP code.
+# ⚠️ Free web services sleep/restart; current OAuth session storage is in memory.
+# This is for initial testing only; reauthentication may be needed after inactivity.
+services:
+  - type: web
+    name: bushin-discord-direct
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/discord-oauth/Dockerfile
+    dockerContext: ./services/discord-oauth
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: BUSHIN_ENABLE_BROWSER_BRIDGE
+        value: "0"
+      # Complete these ONLY in Render's private environment editor.
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: BUSHIN_OWNER_DISCORD_ID
+        sync: false
+# Render provides RENDER_EXTERNAL_HOSTNAME automatically; server.mjs derives
+# its HTTPS PUBLIC_BASE_URL when not overridden in the environment.
