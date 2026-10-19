@@ -61,3 +61,34 @@ CREATE TABLE IF NOT EXISTS mobile_user_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_mobile_oauth_flows_exp ON mobile_oauth_flows(expires_at);
 CREATE INDEX IF NOT EXISTS idx_mobile_user_sessions_exp ON mobile_user_sessions(expires_at);
+
+-- Bushin advanced task queue/approval bookkeeping. This is NOT a background scheduler.
+CREATE TABLE IF NOT EXISTS bushin_tasks (
+ id TEXT PRIMARY KEY,
+ owner_id TEXT NOT NULL,
+ title TEXT NOT NULL,
+ description TEXT NOT NULL DEFAULT '',
+ steps_json TEXT NOT NULL DEFAULT '[]',
+ status TEXT NOT NULL CHECK(status IN ('planned','paused','awaiting_approval','cancelled')),
+ created_at INTEGER NOT NULL,
+ updated_at INTEGER NOT NULL,
+ approval_summary TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_bushin_tasks_owner ON bushin_tasks(owner_id,updated_at);
+CREATE TABLE IF NOT EXISTS bushin_events (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ owner_id TEXT NOT NULL,
+ task_id TEXT,
+ action TEXT NOT NULL,
+ summary TEXT NOT NULL,
+ created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bushin_events_owner ON bushin_events(owner_id,id);
+CREATE INDEX IF NOT EXISTS idx_bushin_events_task ON bushin_events(owner_id,task_id,id);
+CREATE TABLE IF NOT EXISTS bushin_project_state (
+ owner_id TEXT NOT NULL,
+ key TEXT NOT NULL,
+ value_json TEXT NOT NULL,
+ updated_at INTEGER NOT NULL,
+ PRIMARY KEY(owner_id,key)
+);
