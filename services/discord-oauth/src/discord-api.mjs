@@ -6,7 +6,7 @@ const API = "https://discord.com/api/v10";
 export const OAUTH_SCOPES = Object.freeze(["identify", "guilds", "guilds.members.read"]);
 
 export function readBearer(header) {
-  if (typeof header !== "string" || !/^Bearer [A-Za-z0-9._~-]{20,2048}$/.test(header)) return null;
+  if (typeof header !== "string" || !/^Bearer [A-Za-z0-9._~+\/=\-]{20,2048}$/.test(header)) return null;
   return header.slice(7);
 }
 
