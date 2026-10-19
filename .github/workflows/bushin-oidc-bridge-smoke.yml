@@ -1,0 +1,42 @@
+name: "🍥 Bushin Visual — teste OIDC sem Discord"
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  oidc_probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "Validar identidade Github no Worker sem criar sessao"
+        shell: bash
+        env:
+          BUSHIN_BRIDGE: "https://bushin-discord-direct.henrique-silva081106.workers.dev/bridge/runner/register?dry_run=1"
+        run: |
+          python - <<'PY'
+          import json,os,urllib.parse,urllib.request,urllib.error
+          url=os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          separator="&" if "?" in url else "?"
+          url+=separator+urllib.parse.urlencode({"audience":"bushin-cloudflare-visual-v1"})
+          req=urllib.request.Request(url,headers={"Authorization":"Bearer "+os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]})
+          with urllib.request.urlopen(req,timeout=15) as res:
+              jwt=json.load(res).get("value")
+          assert jwt and len(jwt)>150
+          req=urllib.request.Request(os.environ["BUSHIN_BRIDGE"],data=b"{}",method="POST",
+              headers={"Authorization":"Bearer "+jwt,"Content-Type":"application/json","User-Agent":"Bushin-Github-OIDC-Check"})
+          try:
+              with urllib.request.urlopen(req,timeout=20) as res:
+                  status=res.status; text=res.read(1000)
+          except urllib.error.HTTPError as error:
+              status=error.code;text=error.read(1000)
+          print("Bushin OIDC endpoint HTTP",status)
+          print("Content type:",req.headers.get("Content-type"))
+          if status!=200:
+              print("Response category:",text[:120].decode("utf-8","replace"))
+              raise SystemExit(1)
+          data=json.loads(text)
+          assert data.get("verified") is True
+          assert data.get("run_id")==os.environ["GITHUB_RUN_ID"]
+          print("GitHub Actions OIDC signature and original repository identity verified")
+          PY
