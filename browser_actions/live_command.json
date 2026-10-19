@@ -1,7 +1,5 @@
 {
-  "id": "bushin-click-chat-geral-39188253738-07",
+  "id": "bushin-read-chat-geral-39188253738-08",
   "session_id": "39188253738",
-  "action": "click",
-  "x": 223,
-  "y": 148
+  "action": "read_page_text"
 }
