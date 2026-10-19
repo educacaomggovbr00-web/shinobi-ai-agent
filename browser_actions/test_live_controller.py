@@ -29,9 +29,32 @@ class BushinRemoteTests(unittest.TestCase):
             validate_command({**command, "session_id": "another-run"}, RUN)
 
     def test_no_posting_or_shell(self):
-        for action in ("type", "send_message", "post", "shell", "upload"):
+        for action in ("type", "post", "shell", "upload"):
             with self.subTest(action=action), self.assertRaises(ValueError):
                 validate_command({"id": "test", "session_id": RUN, "action": action}, RUN)
+
+    def test_message_commands_are_scoped_and_need_confirm(self):
+        chan = "https://discord.com/channels/1515877468299595919/1520116350360617154"
+        base = {"id": "outgoing1", "session_id": RUN,
+                "channel_url": chan, "text": "Olá, estou disponível para treinar."}
+        self.assertEqual(validate_command({**base, "action":"compose_message"}, RUN), "compose_message")
+        with self.assertRaises(ValueError):
+            validate_command({**base, "action":"send_message"}, RUN)
+        self.assertEqual(validate_command({**base, "action":"send_message", "confirm":True}, RUN), "send_message")
+        self.assertEqual(validate_command({**base, "action":"send_command", "text":"!status", "confirm":True}, RUN), "send_command")
+        self.assertEqual(validate_command({**base, "action":"send_command", "text":"/ficha", "confirm":True}, RUN), "send_command")
+        for target in (
+            "https://discord.com/channels/@me/1520116350360617154",
+            "https://discord.com/channels/999999999999999999/1520116350360617154",
+            "https://discord.com/channels/1515877468299595919/1",
+        ):
+            with self.subTest(channel=target), self.assertRaises(ValueError):
+                validate_command({**base, "channel_url":target, "action":"send_message", "confirm":True}, RUN)
+        for content in ("", "bad\\nline", "ping @everyone", "ola @here", "A"*501, " spaces "):
+            with self.subTest(message=content[:25]), self.assertRaises(ValueError):
+                validate_command({**base, "text":content, "action":"send_message", "confirm":True}, RUN)
+        with self.assertRaises(ValueError):
+            validate_command({**base, "action":"send_command", "text":"/", "confirm":True}, RUN)
 
     def test_explicit_screenshot_allowed(self):
         self.assertEqual(validate_command(
