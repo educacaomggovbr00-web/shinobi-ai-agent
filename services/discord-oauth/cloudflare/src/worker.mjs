@@ -410,11 +410,28 @@ async function mobileHome(req,env){
    if(row?.user_id===env.BUSHIN_OWNER_DISCORD_ID){
      try{const c=await unseal(row.creds_encrypted,env);if(c.expires>now()+30000){
        const me=await verified(env,c);
-       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
+       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
      }}catch{}
    }
  }
  return mPage("Bushin no celular",'<p>Toque para autorizar a sua conta na página oficial do Discord.</p><a class="button" href="/mobile/start">Conectar com Discord</a><p class="muted">Não informe sua senha nesta página.</p>');
+}
+export function personalCommandsConsentUrl(){
+ // USER_INSTALL OAuth shortcut. No change to the existing identity login,
+ // no Discord user token or bot token requested on this separate screen.
+ const url=new URL("https://discord.com/oauth2/authorize");
+ url.searchParams.set("client_id",DISCORD_CLIENT_ID);
+ url.searchParams.set("scope","applications.commands");
+ url.searchParams.set("integration_type","1");
+ return url.toString();
+}
+async function mobilePersonalCommands(req,env){
+ ready(env);
+ const session=mCookie(req,M_SESSION);
+ if(!/^[A-Za-z0-9_-]{40,80}$/.test(session))return mGo("/mobile");
+ const row=await q(env,"SELECT * FROM mobile_user_sessions WHERE token_hash=? AND expires_at>?",await digest(session),now()).first();
+ if(!row || row.user_id!==env.BUSHIN_OWNER_DISCORD_ID)return mGo("/mobile");
+ return mGo(personalCommandsConsentUrl());
 }
 async function mobileStart(req,env){
  const b=ready(env),state="mobile."+rnd(),verifier=rnd()+rnd().slice(0,12);
@@ -460,6 +477,7 @@ export default {
       const b=base(env);
       if(new URL(req.url).origin!==b)return reply({error:"Unrecognized host"},403);
       if((path==="/"||path==="/mobile")&&req.method==="GET")return await mobileHome(req,env);
+      if(path==="/mobile/commands"&&req.method==="GET")return await mobilePersonalCommands(req,env);
       if(path==="/mobile/start"&&req.method==="GET")return await mobileStart(req,env);
       if(path==="/mobile/logout"&&req.method==="POST")return await mobileLogout(req,env);
       if(path==="/oauth/discord/callback"&&req.method==="GET"&&new URL(req.url).searchParams.get("state")?.startsWith("mobile."))return await mobileCallback(req,env);
