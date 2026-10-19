@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import worker,{allowedRedirect,validScope,pkceVerify} from "../src/worker.mjs";
+import worker,{allowedRedirect,validScope,pkceVerify,classifyDiscordTokenFailure} from "../src/worker.mjs";
 
 test("Only ChatGPT official callback paths accepted",()=>{
   assert.equal(allowedRedirect("https://chatgpt.com/connector_platform_oauth_redirect"),true);
@@ -54,4 +54,22 @@ test("Without secrets, registration and OAuth endpoints refuse to authenticate",
  assert.equal(reg.status,500);
  const as=await worker.fetch(new Request(base+"/.well-known/oauth-authorization-server"),env);
  assert.equal(as.status,500);
+});
+
+test("Discord OAuth diagnostics never disclose secrets or provider descriptions",()=>{
+ const cases=[
+   [401,"invalid_client","discord_invalid_client"],
+   [400,"invalid_grant","discord_invalid_grant"],
+   [400,"invalid_request","discord_invalid_request"],
+   [400,"invalid_scope","discord_invalid_scope"],
+   [401,"secret-or-auth-header-was-incorrect","discord_invalid_client"],
+   [429,"rate_limited","discord_rate_limited"],
+   [500,"internal_server_error","discord_unavailable"],
+   [400,"raw-secret-or-customer-token-should-never-be-shown","discord_auth"]
+ ];
+ for(const [status,provider,expected] of cases){
+   const category=classifyDiscordTokenFailure(status,provider);
+   assert.equal(category,expected);
+   assert.ok(!category.includes(provider)||["invalid_client","invalid_grant","invalid_request","invalid_scope"].includes(provider));
+ }
 });
