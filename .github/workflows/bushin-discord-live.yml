@@ -2,9 +2,13 @@ name: "🍥 Bushin — Discord Linux AO VIVO"
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "browser_actions/start-request.json"
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: bushin-discord-${{ github.run_id }}
@@ -28,6 +32,7 @@ jobs:
         run: |
           python -m py_compile browser_actions/live_desktop.py
           python -m py_compile browser_actions/live_controller.py
+          python -m py_compile browser_actions/cloudflare_bridge.py
           node --check browser_actions/snapshot_upload.cjs
           python -m unittest discover -s browser_actions -p 'test_live_controller.py' -v
 
