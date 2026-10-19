@@ -16,6 +16,20 @@ async function get(api,path,token){
 export function officialBotDmReady(env){
  return typeof env.DISCORD_BOT_TOKEN==="string"&&env.DISCORD_BOT_TOKEN.length>30;
 }
+// Read-only validation for the bot used by the Android test-DM panel.
+// Never returns credentials, HTTP headers, or the raw Discord response.
+export async function officialBotIdentity(env){
+ if(!officialBotDmReady(env))return {configured:false,verified:false};
+ const response=await fetch(API+"/users/@me",{
+   headers:{authorization:"Bot "+env.DISCORD_BOT_TOKEN,accept:"application/json"},
+   signal:AbortSignal.timeout(10000)
+ });
+ if(!response.ok)return {configured:true,verified:false,reason:response.status===401?"Bot Token inválido ou revogado.":"Não foi possível confirmar o bot na API do Discord."};
+ const profile=await response.json();
+ if(profile?.bot!==true||!id(profile.id))
+   return {configured:true,verified:false,reason:"O Discord não confirmou uma identidade de bot."};
+ return {configured:true,verified:true,id:profile.id,username:String(profile.username||"Bushin").slice(0,80)};
+}
 function allowed(env,recipient,owner){
  if(!officialBotDmReady(env)||!id(recipient))return false;
  // A DM to the current verified OAuth owner is explicitly eligible without
