@@ -81,6 +81,9 @@ function mockDiscordFetch(input,options){
     if(u.endsWith("/users/@me/guilds/1515877468299595919/member")){
       return Promise.resolve(Response.json({nick:"Genin",roles:["role1","role2"]}));
     }
+    if(u.endsWith("/users/@me/guilds")){
+      return Promise.resolve(Response.json([{id:"1515877468299595919",name:"Naruto Project RP",owner:false,permissions:"hidden"}]));
+    }
     throw Error("External Discord endpoint outside allowlist "+u);
   }
   return nativeFetch(input,options);
@@ -190,6 +193,21 @@ test("Cloudflare D1 supports a full simulated Discord OAuth + MCP login",async()
     const who=await authCall("bushin_discord_whoami");
     assert.equal(who.username,"test_ninja");
     assert.equal(JSON.stringify(who).includes("hidden@example.com"),false);
+    const status=await authCall("bushin_session_status");
+    assert.equal(status.state,"connected");
+    assert.equal(status.mcp_oauth_authenticated,true);
+    assert.equal(status.discord_account.username,"test_ninja");
+    assert.equal(status.member_naruto_rp,true);
+    assert.deepEqual(status.granted_scopes,scopes.split(" "));
+    assert.equal(status.available.server_list,true);
+    assert.equal(status.available.channel_messages_as_user,false);
+    assert.equal(status.available.send_as_user,false);
+    assert.equal(status.requires_linux_for_identity,false);
+    assert.equal(JSON.stringify(status).includes("fake-discord"),false);
+    const servers=await authCall("bushin_discord_list_servers");
+    assert.equal(servers.state,"completed");
+    assert.deepEqual(servers.servers,[{id:"1515877468299595919",name:"Naruto Project RP",owner:false}]);
+    assert.equal(JSON.stringify(servers).includes("permissions"),false);
     const member=await authCall("bushin_discord_naruto_membership");
     assert.equal(member.member,true);
     assert.equal(member.guild_id,"1515877468299595919");
