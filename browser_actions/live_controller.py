@@ -11,9 +11,11 @@ import datetime
 import ipaddress
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import time
+import uuid
 from urllib.parse import urlsplit
 
 REPO = "educacaomggovbr00-web/shinobi-ai-agent"
@@ -49,8 +51,8 @@ def validate_command(command, run_id):
     if not isinstance(ident, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,80}", ident):
         raise ValueError("Invalid command id")
     action = command.get("action")
-    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation"):
-        raise ValueError("Unsupported action: use status, open_url, read_page_text, scroll or click_navigation")
+    if action not in ("status", "open_url", "read_page_text", "scroll", "click_navigation", "screenshot"):
+        raise ValueError("Unsupported action: use status, open_url, read_page_text, scroll, click_navigation or screenshot")
     if action == "open_url":
         validate_url(command.get("url"))
     if action == "scroll":
@@ -93,16 +95,64 @@ def gh_put(path, payload):
     raise RuntimeError("Could not publish result to private GitHub repository")
 
 async def get_page(browser):
-    contexts = browser.contexts
-    if not contexts or not contexts[0].pages:
+    # Prefer the authorized Naruto RP tab, not the originally launched login tab.
+    pages = [p for context in browser.contexts for p in context.pages]
+    if not pages:
         raise RuntimeError("No open browser page")
-    return contexts[0].pages[0]
+    guild_path = "/channels/" + GUILD_ID
+    for page in reversed(pages):
+        parsed = urlsplit(page.url)
+        if parsed.hostname in ("discord.com", "www.discord.com") and (
+                parsed.path == guild_path or parsed.path.startswith(guild_path + "/")):
+            return page
+    # If the user navigated to other Discord tabs, display only a sanitized URL.
+    for page in reversed(pages):
+        parsed = urlsplit(page.url)
+        if parsed.hostname in ("discord.com", "www.discord.com") and parsed.path != "/login":
+            return page
+    return pages[-1]
 
 def redacted_page_url(url):
     parsed = urlsplit(url)
     if parsed.hostname not in ("discord.com", "www.discord.com"):
         return "outside discord.com"
     return parsed.scheme + "://" + parsed.hostname + parsed.path[:250]
+
+async def publish_private_screenshot(page, run_id):
+    """Capture only the approved Naruto RP page; publish no image into commits."""
+    parsed = urlsplit(page.url)
+    guild_path = "/channels/" + GUILD_ID + "/"
+    if parsed.hostname not in ("discord.com", "www.discord.com") or not parsed.path.startswith(guild_path):
+        raise ValueError("Capture denied: open an authorized Naruto Project RP channel first")
+    # Never include account login / password overlays in a screenshot.
+    password_boxes = await page.locator('input[type="password"]').count()
+    if password_boxes:
+        raise ValueError("Capture denied: a password field is visible")
+    out_dir = Path("/tmp/bushin-snapshots")
+    out_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(out_dir, 0o700)
+    image_file = out_dir / ("capture-" + uuid.uuid4().hex + ".jpg")
+    name = "bushin-snapshot-" + str(run_id) + "-" + uuid.uuid4().hex[:14]
+    try:
+        await page.screenshot(path=str(image_file), type="jpeg", quality=68, full_page=False, timeout=12000)
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            ["node", "browser_actions/snapshot_upload.cjs", str(image_file), name],
+            capture_output=True, text=True, timeout=75)
+        if proc.returncode:
+            raise RuntimeError("Screenshot artifact upload failed; image was not committed")
+        response = json.loads(proc.stdout.strip().splitlines()[-1])
+        if not response.get("artifact_id"):
+            raise RuntimeError("Screenshot uploader returned no artifact ID")
+        return {
+            "artifact_id": response["artifact_id"],
+            "artifact_name": name,
+            "retention_days": 1,
+            "visible_page": redacted_page_url(page.url),
+            "note": "Private Actions artifact only; request its download to show the JPEG in ChatGPT."
+        }
+    finally:
+        image_file.unlink(missing_ok=True)
 
 async def perform(action, command):
     from playwright.async_api import async_playwright
@@ -111,6 +161,8 @@ async def perform(action, command):
         try:
             page = await get_page(browser)
             current_url = redacted_page_url(page.url)
+            if action == "screenshot":
+                return await publish_private_screenshot(page, command["session_id"])
             if action == "status":
                 return {"online": True, "url": current_url, "title": (await page.title())[:180]}
             if action == "open_url":
@@ -154,6 +206,7 @@ async def listen_commands():
         last_id = previous.get("id") if isinstance(previous, dict) else None
     except Exception:
         last_id = None
+    screenshot_count = 0
     print("🍥 Bushin control ready: commands through private GitHub repository, run " + run_id, flush=True)
     while True:
         try:
@@ -163,6 +216,10 @@ async def listen_commands():
                     and str(command.get("session_id", "")) == str(run_id)):
                 try:
                     action = validate_command(command, run_id)
+                    if action == "screenshot":
+                        if screenshot_count >= 6:
+                            raise ValueError("Screenshot limit reached (6 per Linux session)")
+                        screenshot_count += 1
                     value = await perform(action, command)
                     result = {"id": current_id, "session_id": run_id,
                               "action": action, "ok": True, "data": value}
