@@ -256,7 +256,7 @@ async def start():
         # Independent temporary signed GitHub Actions identity bridge. The
         # Cloudflare bridge can fail without killing the secure desktop.
         from cloudflare_bridge import run_bridge
-        cloudflare_task = asyncio.create_task(run_bridge())
+        cloudflare_task = asyncio.create_task(run_bridge(user_url))
         started = time.monotonic()
         browser_disconnects = 0
         browser_restarts = 0
