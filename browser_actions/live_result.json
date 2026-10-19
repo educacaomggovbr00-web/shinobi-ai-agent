@@ -1,13 +1,14 @@
 {
-  "id": "bushin-check-login-39188253738-02",
+  "id": "bushin-shot-rp-39188253738-04",
   "session_id": "39188253738",
-  "action": "status",
+  "action": "screenshot",
   "ok": true,
   "data": {
-    "online": true,
-    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
-    "title": "(532) Discord | #│・📢〃﹕𝐂hamar-𝐑p | ʚ🍥ɞ 𝐍aruto 𝐏roject ᴿᴾ ⁺ ✦ ˙",
-    "public_entry_url": "https://asking-determined-tracked-salvation.trycloudflare.com/vnc.html?autoconnect=1&resize=scale"
+    "artifact_id": 12160331937,
+    "artifact_name": "bushin-snapshot-39188253738-f4fac3c3b3fb4d",
+    "retention_days": 1,
+    "visible_page": "https://discord.com/channels/1515877468299595919/1520116350360617154",
+    "note": "Private Actions artifact only; request its download to show the JPEG in ChatGPT."
   },
-  "finished_at_utc": "2026-10-19T02:42:21.075119+00:00"
+  "finished_at_utc": "2026-10-19T02:45:59.052908+00:00"
 }
