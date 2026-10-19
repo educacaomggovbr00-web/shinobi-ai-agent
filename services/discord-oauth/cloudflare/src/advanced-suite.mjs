@@ -34,6 +34,7 @@ const specs=[
  ["discord_send_dm","Enviar DM de bot autorizada",["recipient_id","content","confirmed"]],
  ["discord_execute_command","Orientar comando de aplicativo",["command"]],
  ["discord_get_membership","Participação no Naruto RP",[]],
+ ["discord_dm_status","Status das DMs autorizadas do bot",[]],
  ["discord_upload_attachment","Enviar arquivo pelo bot",["channel_id","file_id","confirmed"]],
  ["task_start","Criar tarefa de múltiplas etapas",["title"]],
  ["task_status","Consultar tarefa",["task_id"]],
@@ -73,7 +74,7 @@ const property={
 const readonly=new Set([
  "browser_status","browser_screenshot","browser_read_page","browser_inspect_ui","browser_tabs",
  "browser_live_view","browser_takeover","discord_whoami","discord_list_servers",
- "discord_list_channels","discord_read_messages","discord_get_membership",
+ "discord_list_channels","discord_read_messages","discord_get_membership","discord_dm_status",
  "task_status","task_logs","session_reconnect","files_list","files_read","files_download",
  "github_read_repo","bushin_load_state","auth_status","auth_connect","auth_disconnect",
  "permissions_check","audit_log","ui_live_panel"
