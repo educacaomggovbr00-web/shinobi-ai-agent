@@ -12,7 +12,7 @@ import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
 import {logToolAction,stateCall} from "./state-suite.mjs";
-import {visualRunner,visualMobile} from "./visual-bridge.mjs";
+import {visualRunner,visualMobile,visualTakeover} from "./visual-bridge.mjs";
 import {discordCall,officialBotDmReady,officialBotIdentity} from "./discord-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
@@ -687,12 +687,17 @@ export default {
       if(new URL(req.url).origin!==b)return reply({error:"Unrecognized host"},403);
       if((path==="/"||path==="/mobile")&&req.method==="GET")return await mobileHome(req,env);
       if(path==="/mobile/features"&&req.method==="GET")return await mobileFeatures(req,env);
+      if(path==="/mobile/visual/takeover"&&req.method==="GET"){
+        const row=await mobileSessionOwner(req,env);
+        if(!row)return mGo("/mobile");
+        return await visualTakeover(req,env,{ownerId:row.user_id,unseal:v=>unseal(v,env),redirect:mGo});
+      }
       if(path==="/mobile/visual"&&["GET","POST"].includes(req.method)){
         const row=await mobileSessionOwner(req,env);
         if(!row)return mGo("/mobile");
         return await visualMobile(req,env,{ownerId:row.user_id,escape:mEsc,page:mPage,redirect:mGo,base:ready(env)});
       }
-      if(path.startsWith("/bridge/runner/"))return await visualRunner(req,env);
+      if(path.startsWith("/bridge/runner/"))return await visualRunner(req,env,{seal:v=>seal(v,env)});
       if(path==="/mobile/workspace"&&["GET","POST"].includes(req.method))return await mobileWorkspace(req,env);
       if(path==="/mobile/servers"&&req.method==="GET")return await mobileServers(req,env);
       if(path==="/mobile/dm"&&["GET","POST"].includes(req.method))return await mobileDm(req,env);
