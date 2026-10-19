@@ -184,6 +184,13 @@ export async function visualRunner(req,env,{seal=null}={}){
  }
  return fail("Not found",404);
 }
+function validMobileFormOrigin(req,base){
+ const origin=req.headers.get("origin");
+ if(origin)return origin===base;
+ const referer=req.headers.get("referer");
+ if(!referer)return false;
+ try{return new URL(referer).origin===base}catch{return false}
+}
 export async function visualMobile(req,env,{ownerId,escape,page,redirect,base}){
  const clock=millis();
  const rows=await query(env,"SELECT run_id,expires_at,last_seen,takeover_encrypted FROM bushin_visual_sessions WHERE owner_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 1",
@@ -191,7 +198,7 @@ export async function visualMobile(req,env,{ownerId,escape,page,redirect,base}){
  const runner=rows.results?.[0]||null;
  const online=runner&&runner.last_seen>clock-60000;
  if(req.method==="POST"){
-   if(req.headers.get("origin")!==base)return fail("Invalid form origin",403);
+   if(!validMobileFormOrigin(req,base))return fail("Invalid form origin",403);
    if(!(req.headers.get("content-type")||"").startsWith("application/x-www-form-urlencoded"))return fail("Invalid form encoding",415);
    if(Number(req.headers.get("content-length")||0)>5000)return fail("Form too large",413);
    const body=await req.text();if(body.length>5000)return fail("Form too large",413);
@@ -221,6 +228,10 @@ export async function visualMobile(req,env,{ownerId,escape,page,redirect,base}){
   ["status","Verificar status"],["rpg_view","Ler RPG atual"],["read_page_text","Ler página"],["tabs","Listar abas"],
   ["inspect_ui","Inspecionar botões"],["screenshot","Capturar tela"]
  ].map(([action,title])=>'<form method="post" action="/mobile/visual" style="margin:7px 0"><input type="hidden" name="action" value="'+action+'"><button class="button" style="margin:0" type="submit">'+title+'</button></form>').join("");
+ const tools='<h2>Navegação rápida</h2>'+
+  '<form method="post" action="/mobile/visual" style="display:inline-block;margin:4px"><input type="hidden" name="action" value="scroll"><input type="hidden" name="direction" value="up"><input type="hidden" name="amount" value="3"><button class="button" style="margin:0">Rolar para cima</button></form>'+
+  '<form method="post" action="/mobile/visual" style="display:inline-block;margin:4px"><input type="hidden" name="action" value="scroll"><input type="hidden" name="direction" value="down"><input type="hidden" name="amount" value="3"><button class="button" style="margin:0">Rolar para baixo</button></form>'+
+  '<form method="post" action="/mobile/visual"><input type="hidden" name="action" value="press"><input type="hidden" name="key" value="Escape"><button class="button">Voltar/fechar menu</button></form>';
  const form='<h2>Navegar no Naruto RP</h2><form method="post" action="/mobile/visual"><input type="hidden" name="action" value="open_url"><label>URL de canal</label><input style="width:100%;padding:12px" name="url" placeholder="https://discord.com/channels/..."><button class="button">Abrir canal</button></form>'+
  '<h2>Preparar uma mensagem</h2><form method="post" action="/mobile/visual"><input type="hidden" name="action" value="compose_message"><label>URL exata do canal</label><input name="url" style="width:100%;padding:12px" required><label>Texto</label><textarea name="text" maxlength="500" style="width:100%;min-height:100px" required></textarea><button class="button">Digitar sem enviar</button></form>'+
  '<h2>Enviar com confirmação</h2><form method="post" action="/mobile/visual"><input type="hidden" name="action" value="send_message"><label>URL exata do canal</label><input name="url" style="width:100%;padding:12px" required><label>Texto a enviar</label><textarea name="text" maxlength="500" style="width:100%;min-height:100px" required></textarea><label><input type="checkbox" name="confirmed" value="yes" required> Confirmo o envio no canal escolhido</label><button class="button">Enviar mensagem</button></form>';
@@ -229,7 +240,7 @@ export async function visualMobile(req,env,{ownerId,escape,page,redirect,base}){
  const takeover=online&&runner.takeover_encrypted?
    '<a class="button" href="/mobile/visual/takeover">Assumir navegador visual (acesso protegido)</a>':"";
  const html=(message?'<p>'+escape(message)+'</p>':"")+hint+
-   takeover+'<h2>Comandos rápidos</h2>'+actions+form+
+   takeover+'<h2>Comandos rápidos</h2>'+actions+tools+form+
    '<h2>Resultados recentes</h2>'+(recent.results||[]).map(renderResult).join("")+
    '<a class="button" href="/mobile/visual">Atualizar resultados</a><a class="button" href="/mobile">Voltar ao Bushin</a>';
  return page("Controle visual do Bushin",html);
