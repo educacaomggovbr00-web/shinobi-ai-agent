@@ -34,3 +34,24 @@ jobs:
           grep -q 'bushin_browser_screenshot' services/discord-oauth/src/server.mjs
           grep -q 'Clicar na imagem' services/discord-oauth/public/browser-console.html
           ! grep -q 'send_message' services/discord-oauth/src/server.mjs
+      - name: "Testar deploy Docker do Discord Direct (credenciais fictícias)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -t bushin-discord-direct:test services/discord-oauth
+          docker run -d --name bushin-discord-ci -p 127.0.0.1:13002:3000 \
+            -e PUBLIC_BASE_URL=https://bushin.example \
+            -e BUSHIN_OWNER_DISCORD_ID=123456789012345678 \
+            -e DISCORD_CLIENT_SECRET=fake-secret-for-ci-only-abcdefghij \
+            bushin-discord-direct:test
+          trap 'docker rm -f bushin-discord-ci >/dev/null 2>&1 || true' EXIT
+          for n in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:13002/health > health.json; then break; fi
+            sleep 1
+          done
+          node -e '
+            const x=require("./health.json");
+            if(x.mode!=="discord_direct"||x.requires_github_for_discord!==false||
+               x.connected!==false||x.login_required!==true) process.exit(1);
+            console.log("Discord Direct Docker smoke: OK (sem GitHub)")
+          '
