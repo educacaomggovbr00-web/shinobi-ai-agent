@@ -56,3 +56,13 @@ npm start
 Testes contínuos: https://github.com/educacaomggovbr00-web/shinobi-ai-agent/actions/workflows/bushin-discord-oauth-tests.yml
 
 Código sempre no repo original: https://github.com/educacaomggovbr00-web/shinobi-ai-agent/tree/main/services/discord-oauth
+
+## 🍥 Discord Direct — usar o Bushin como conector sem GitHub
+
+**O caminho principal é o Discord diretamente**, como um conector de conta no ChatGPT. O serviço só precisa de HTTPS estável e das variáveis secretas de OAuth Discord (`PUBLIC_BASE_URL`, `DISCORD_CLIENT_SECRET`, `BUSHIN_OWNER_DISCORD_ID`). Para confirmar identidade e vínculo ao Naruto RP, **não é necessário `BUSHIN_GITHUB_TOKEN` nem conectar a conta GitHub ao ChatGPT**.
+
+Por padrão, `BUSHIN_ENABLE_BROWSER_BRIDGE` é ausente ou diferente de `1`: o servidor anuncia **somente** as duas ferramentas Discord `bushin_discord_whoami` e `bushin_discord_naruto_membership`. O navegador visual, seus controles e screenshot não aparecem nessa configuração. O endpoint `/health` informa `mode=discord_direct` e `requires_github_for_discord=false`.
+
+A função visual legada só deve ser habilitada intencionalmente com `BUSHIN_ENABLE_BROWSER_BRIDGE=1` **e** `BUSHIN_GITHUB_TOKEN` definido na hospedagem. Essa função é independente do login Discord, e pode ser substituída futuramente por um navegador remoto com hospedagem própria, sem GitHub Actions. Sem backend de navegador, OAuth Discord não dá acesso ao Discord Web UI nem permite ler/enviar mensagens de canais livremente.
+
+**Estado:** arquitetura implementada e testes automatizados aprovados; ainda não existe serviço HTTPS implantado nem `mcp.json` configurado no plugin original. Assim, o botão de conectar só estará disponível depois de publicar um servidor de autenticação e configurá-lo na mesma instalação do Bushin.
