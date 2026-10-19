@@ -673,7 +673,17 @@ async function mobileCallback(req,env){
  }
 }
 async function mobileLogout(req,env){
- if(req.headers.get("origin")!==ready(env))return reply({error:"Invalid origin"},403);
+ // Browser form POSTs can omit Origin. Keep CSRF protection by accepting an
+ // exact same-origin Referer only when Origin is absent (never if mismatched).
+ const expected=ready(env);
+ const origin=req.headers.get("origin");
+ const referer=req.headers.get("referer");
+ let sameSite=false;
+ if(origin===expected)sameSite=true;
+ else if(!origin&&referer){
+   try{sameSite=new URL(referer).origin===expected}catch{}
+ }
+ if(!sameSite)return reply({error:"Invalid origin"},403);
  const session=mCookie(req,M_SESSION);
  if(/^[A-Za-z0-9_-]{40,80}$/.test(session))await q(env,"DELETE FROM mobile_user_sessions WHERE token_hash=?",await digest(session)).run();
  return mGo("/mobile",[mSet(M_SESSION,"",0)]);
