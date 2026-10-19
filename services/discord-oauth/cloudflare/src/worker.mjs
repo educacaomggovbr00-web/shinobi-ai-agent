@@ -11,7 +11,8 @@
 import {botReady,BOT_TOOLS,botCall} from "./bot-permissions.mjs";
 import {BROWSER_TOOLS,browserCall} from "./browser-bridge.mjs";
 import {ADVANCED_TOOLS,ADVANCED_NAMES,advancedCall} from "./advanced-suite.mjs";
-import {logToolAction} from "./state-suite.mjs";
+import {logToolAction,stateCall} from "./state-suite.mjs";
+import {discordCall} from "./discord-suite.mjs";
 const DISCORD_CLIENT_ID="1561589128108314636";
 const NARUTO_GUILD_ID="1515877468299595919";
 const SCOPES=["identify","guilds","guilds.members.read"];
@@ -418,7 +419,7 @@ async function mobileHome(req,env){
    if(row?.user_id===env.BUSHIN_OWNER_DISCORD_ID){
      try{const c=await unseal(row.creds_encrypted,env);if(c.expires>now()+30000){
        const me=await verified(env,c);
-       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
+       return mPage("Discord conectado",'<p class="ok">✓ Conta verificada</p><div class="user">'+mEsc(me.display_name)+'</div><p>@'+mEsc(me.username)+'</p><p class="ok">✓ Membro do Naruto Project RP</p><a class="button" href="/mobile/workspace">Tarefas e memória — usar agora</a><a class="button" href="/mobile/servers">Meus servidores Discord</a><a class="button" href="/mobile/features">Ver ferramentas do Bushin</a><a class="button" href="/mobile/commands">Autorizar comandos pessoais do Bushin</a><p class="muted">OAuth applications.commands: instalar o aplicativo na sua conta, sem permissao de administrador do servidor. Nao permite ler mensagens nem enviar como sua conta. O Discord precisa oferecer instalacao por usuario e o Bushin precisa registrar os comandos.</p><form method="post" action="/mobile/logout"><button class="button" type="submit">Desconectar</button></form>');
      }}catch{}
    }
  }
@@ -453,8 +454,110 @@ async function mobileFeatures(req,env){
       names.map(t=>'<li><code>'+mEsc(t.name.slice(7))+'</code></li>').join("")+'</ul></details>';
  }).join("");
  const note='<p class="muted">O aplicativo Discord autoriza identidade e comandos pessoais, mas não concede automaticamente leitura/DM/envio como usuário. O ChatGPT Android continua em modo skill-only; ferramentas MCP não estão conectadas ao app.</p>';
- return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile">Voltar à conta</a>');
+ return mPage("Ferramentas do Bushin",'<p class="ok">✓ Sua sessão móvel continua conectada.</p><p>Catálogo de ferramentas do projeto. Abra uma categoria para conferir.</p>'+cards+note+'<a class="button" href="/mobile/workspace">Usar tarefas e memória</a><a class="button" href="/mobile/servers">Listar meus servidores</a><a class="button" href="/mobile">Voltar à conta</a>');
 }
+
+async function mobileSessionOwner(req,env){
+ ready(env);
+ const raw=mCookie(req,M_SESSION);
+ if(!/^[A-Za-z0-9_-]{40,80}$/.test(raw))return null;
+ const row=await q(env,"SELECT user_id,creds_encrypted FROM mobile_user_sessions WHERE token_hash=? AND expires_at>?",await digest(raw),now()).first();
+ if(!row||row.user_id!==env.BUSHIN_OWNER_DISCORD_ID)return null;
+ return row;
+}
+function mobileActionForm(op,id,label){
+ return '<form method="post" action="/mobile/workspace" style="display:inline-block;margin:3px 3px 3px 0">'+
+  '<input type="hidden" name="op" value="'+mEsc(op)+'">'+
+  '<input type="hidden" name="task_id" value="'+mEsc(id)+'">'+
+  '<button class="smallbutton" type="submit">'+mEsc(label)+'</button></form>';
+}
+async function mobileWorkspace(req,env){
+ const row=await mobileSessionOwner(req,env);
+ if(!row)return mGo("/mobile");
+ const owner=row.user_id,context={me:{id:owner}};
+ let notice="";
+ if(req.method==="POST"){
+   if(req.headers.get("origin")!==ready(env))return reply({error:"Wrong form origin"},403);
+   if(!(req.headers.get("content-type")||"").startsWith("application/x-www-form-urlencoded"))
+     return reply({error:"Expected form"},415);
+   const raw=await req.text();
+   if(raw.length>8192)return reply({error:"Form too long"},413);
+   const p=new URLSearchParams(raw);
+   const action=p.get("op")||"";
+   try{
+     if(action==="create"){
+       await stateCall(env,"task_start",{title:p.get("title")||"",description:(p.get("description")||"").slice(0,1000),steps:[]},context);
+       notice="Tarefa criada. Ela não roda sozinha.";
+     }else if(["task_pause","task_resume","task_cancel"].includes(action)){
+       await stateCall(env,action,{task_id:p.get("task_id")||"",confirmed:true},context);
+       notice="Estado da tarefa atualizado.";
+     }else if(action==="state_save"){
+       const rawValue=p.get("value")||"";
+       if(rawValue.length>2000||!rawValue.trim())throw Error("Texto do progresso inválido.");
+       await stateCall(env,"bushin_save_state",{
+         key:p.get("key")||"naruto_progress",
+         value:rawValue.trim(),confirmed:true
+       },context);
+       notice="Progresso salvo no banco privado.";
+     }else return reply({error:"Unknown action"},400);
+   }catch(err){
+     return mPage("Bushin — operação não concluída",'<p>'+mEsc(String(err?.message||"Erro").slice(0,240))+
+       '</p><a class="button" href="/mobile/workspace">Voltar ao painel</a>');
+   }
+ }else if(req.method!=="GET")return reply({error:"Method not allowed"},405);
+ const tasks=(await q(env,"SELECT id,title,status,approval_summary,updated_at FROM bushin_tasks WHERE owner_id=? ORDER BY updated_at DESC LIMIT 15",owner).all()).results||[];
+ const saved=(await q(env,"SELECT key,value_json,updated_at FROM bushin_project_state WHERE owner_id=? ORDER BY updated_at DESC LIMIT 10",owner).all()).results||[];
+ const events=(await q(env,"SELECT action,summary,created_at FROM bushin_events WHERE owner_id=? ORDER BY id DESC LIMIT 12",owner).all()).results||[];
+ const rows=tasks.map(t=>{
+   const tools=t.status==="cancelled"?"":mobileActionForm("task_pause",t.id,"Pausar")+
+     mobileActionForm("task_resume",t.id,"Retomar")+
+     mobileActionForm("task_cancel",t.id,"Cancelar");
+   return '<li style="padding:10px 0"><strong>'+mEsc(t.title)+'</strong> <span class="muted">('+mEsc(t.status)+')</span><div>'+tools+'</div></li>';
+ }).join("");
+ const memories=saved.map(x=>{
+   let value="";try{value=JSON.parse(x.value_json);}catch{value="(não legível)"}
+   return '<li><strong>'+mEsc(x.key)+'</strong>: '+mEsc(typeof value==="string"?value:JSON.stringify(value)).slice(0,350)+'</li>';
+ }).join("");
+ const history=events.map(x=>'<li>'+mEsc(x.action)+' — '+mEsc(x.summary)+'</li>').join("");
+ const formStyle='<style>input[type=text],textarea{display:block;background:#0b1020;color:white;border:1px solid #526483;border-radius:9px;padding:11px;margin:8px 0 14px;box-sizing:border-box;width:100%;font:inherit}.smallbutton{background:#35446f;color:white;border:1px solid #7182af;border-radius:8px;padding:9px;font:inherit}h2{font-size:20px;margin-top:22px}ul{padding-left:20px}form{margin:8px 0}</style>';
+ const html=formStyle+'<p class="ok">✓ Painel autenticado</p><p class="muted">As tarefas ficam guardadas no D1. Não há execução automática em segundo plano.</p>'+
+   (notice?'<p class="ok">'+mEsc(notice)+'</p>':'')+
+   '<h2>Nova tarefa Naruto RP</h2><form method="post" action="/mobile/workspace">'+
+   '<input type="hidden" name="op" value="create"><label>Título<input type="text" maxlength="150" name="title" placeholder="Treinar na Academia" required></label>'+
+   '<label>Detalhes<textarea name="description" rows="3" maxlength="1000" placeholder="Próximos passos do personagem"></textarea></label>'+
+   '<button class="smallbutton" type="submit">Salvar tarefa</button></form>'+
+   '<h2>Minhas tarefas</h2>'+(rows?'<ul>'+rows+'</ul>':'<p>Ainda não há tarefas.</p>')+
+   '<h2>Salvar progresso</h2><form method="post" action="/mobile/workspace">'+
+   '<input type="hidden" name="op" value="state_save"><label>Chave<input type="text" name="key" maxlength="70" value="naruto_progress" required></label>'+
+   '<label>Anotações<textarea name="value" rows="4" maxlength="2000" placeholder="Minha graduação, treino, local atual..." required></textarea></label>'+
+   '<button class="smallbutton" type="submit">Guardar progresso</button></form>'+
+   '<h2>Memória salva</h2>'+(memories?'<ul>'+memories+'</ul>':'<p>Nenhum registro ainda.</p>')+
+   '<h2>Histórico</h2>'+(history?'<ul>'+history+'</ul>':'<p>Nenhum evento ainda.</p>')+
+   '<a class="button" href="/mobile/features">Ver outras ferramentas</a>';
+ return mPage("Bushin — tarefas e progresso",html);
+}
+async function mobileServers(req,env){
+ const row=await mobileSessionOwner(req,env);
+ if(!row)return mGo("/mobile");
+ if(req.method!=="GET")return reply({error:"Method not allowed"},405);
+ try{
+   const creds=await unseal(row.creds_encrypted,env);
+   if(creds.expires<now()+30000)return mPage("Discord expirou",'<p>Entre novamente pelo portal Discord.</p><a class="button" href="/mobile">Voltar</a>');
+   const data=await discordCall(env,"discord_list_servers",{},{
+     me:{id:row.user_id},creds
+   });
+   const servers=(data.servers||[]).map(s=>'<li style="padding:8px 0">'+mEsc(s.name)+
+     (s.owner?' <span class="ok">(você administra)</span>':'')+'</li>').join("");
+   return mPage("Meus servidores Discord",'<p class="ok">✓ Lista consultada pela API oficial com seu OAuth autorizado.</p>'+
+     (servers?'<ul>'+servers+'</ul>':'<p>Nenhum servidor retornado.</p>')+
+     '<p class="muted">Esta lista não concede leitura dos canais nem envio de mensagens.</p>'+
+     '<a class="button" href="/mobile/workspace">Abrir tarefas</a>');
+ }catch(err){
+   return mPage("Não foi possível consultar servidores",'<p>A autorização pode ter expirado ou a API está temporariamente indisponível.</p>'+
+     '<a class="button" href="/mobile">Voltar</a>');
+ }
+}
+
 async function mobilePersonalCommands(req,env){
  ready(env);
  const session=mCookie(req,M_SESSION);
@@ -508,6 +611,8 @@ export default {
       if(new URL(req.url).origin!==b)return reply({error:"Unrecognized host"},403);
       if((path==="/"||path==="/mobile")&&req.method==="GET")return await mobileHome(req,env);
       if(path==="/mobile/features"&&req.method==="GET")return await mobileFeatures(req,env);
+      if(path==="/mobile/workspace"&&["GET","POST"].includes(req.method))return await mobileWorkspace(req,env);
+      if(path==="/mobile/servers"&&req.method==="GET")return await mobileServers(req,env);
       if(path==="/mobile/commands"&&req.method==="GET")return await mobilePersonalCommands(req,env);
       if(path==="/mobile/start"&&req.method==="GET")return await mobileStart(req,env);
       if(path==="/mobile/logout"&&req.method==="POST")return await mobileLogout(req,env);
