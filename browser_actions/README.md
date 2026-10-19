@@ -67,3 +67,15 @@ Como funciona em **sessões novas** do Linux (as execuções já iniciadas não 
 6. Restrição: somente canais de Naruto Project RP, sem campos de senha, limite de 6 capturas por execução. Cada captura é guardada temporariamente no armazenamento de artifacts privado e pode ser acessada por pessoas com acesso ao repositório durante o período de retenção.
 
 O link noVNC continua externo e pode ser usado em paralelo pelo usuário para vídeo realmente ao vivo. O teste bem-sucedido não confirma ainda uma captura de Discord: depende de iniciar uma nova sessão com o código atualizado. **A execução #39178166963 foi iniciada antes do novo código e não oferece o comando screenshot.**
+
+
+## 🔐 Bushin v1.6 — entrada pública com autenticação
+
+Nas **novas execuções** do workflow de desktop, a raiz do túnel Cloudflare e `/vnc.html` exibem uma página pública de **login** em vez de retornar imediatamente HTTP 403. A página pública não inclui pixels do desktop, scripts do noVNC ou acesso ao WebSocket antes da autenticação.
+
+- Clique no **link privado** exibido no resumo/log da própria execução GitHub Actions: `/connect?key=...` autentica com o segredo aleatório da sessão e grava um cookie `Secure`, `HttpOnly`, `SameSite=Lax`.
+- Alternativamente, abra a URL **sem o segredo** (domínio `https://....trycloudflare.com/vnc.html`) e preencha no formulário a chave daquela mesma execução, **somente na página segura**. Não cole o segredo em chats, prompts, commits ou sistemas de automação.
+- Sem sessão autenticada, solicitações de JavaScript/CSS da interface, WebSocket do VNC e quaisquer outras rotas internas permanecem negadas (`403`).
+- A execução continua efêmera (até 6h incluindo provisionamento); novas versões **não** são aplicadas retroativamente em sessões já iniciadas.
+
+**Importante:** essa mudança não torna o desktop público ou acessível diretamente ao TinyFish/Browser Use sem autenticação. Esses serviços precisariam de uma sessão web autenticada própria, configurada pela interface segura deles. Não publique o link privado ou a chave na conversa.
