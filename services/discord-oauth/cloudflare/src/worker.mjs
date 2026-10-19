@@ -386,7 +386,7 @@ function mSet(name,value,age){return name+"="+value+"; Secure; HttpOnly; SameSit
 function mEsc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function mPage(title,content){
  const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bushin — Discord no celular</title><style>'+MOBILE_CSS+'</style><main><div style="font-size:48px">🍥</div><h1>'+title+'</h1><p>Conexão do Discord para Android. Não precisa de Linux.</p><div class="card">'+content+'</div><p class="muted">Login oficial do Discord: identify, guilds, guilds.members.read. Sem leitura de mensagens ou DMs. Esta página não habilita automaticamente as ferramentas MCP no aplicativo ChatGPT.</p></main></html>';
- return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'","referrer-policy":"no-referrer","x-content-type-options":"nosniff","x-frame-options":"DENY"}});
+ return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'","referrer-policy":"same-origin","x-content-type-options":"nosniff","x-frame-options":"DENY"}});
 }
 function mGo(to,cookies=[]){const h=new Headers({"location":to,"cache-control":"no-store","referrer-policy":"no-referrer"});for(const c of cookies)h.append("set-cookie",c);return new Response(null,{status:303,headers:h})}
 async function mobileHome(req,env){
