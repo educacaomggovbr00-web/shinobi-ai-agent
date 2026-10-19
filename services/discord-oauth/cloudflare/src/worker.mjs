@@ -61,6 +61,17 @@ export function validScope(raw){
   const scopes=raw.trim().split(/\s+/);
   return scopes.length===3 && new Set(scopes).size===3 && scopes.every(s=>SCOPES.includes(s));
 }
+// Authorization requests still seek all three scopes. Discord may grant only
+// identify + guilds; this supports identity and verified guild membership,
+// but must never be presented as guilds.members.read permission.
+export function validGrantedScope(raw){
+  if(typeof raw!=="string")return false;
+  const granted=raw.trim().split(/\s+/);
+  return granted.length>=2 && granted.length<=3 &&
+    new Set(granted).size===granted.length &&
+    granted.includes("identify") && granted.includes("guilds") &&
+    granted.every(s=>SCOPES.includes(s));
+}
 const verifierRE=/^[A-Za-z0-9_.~-]{43,128}$/;
 const challengeRE=/^[A-Za-z0-9_-]{43,128}$/;
 export async function pkceVerify(verifier,challenge){
@@ -182,11 +193,11 @@ async function discordToken(env,data){
   const j=await response.json();
   if(!j.access_token||!j.refresh_token||!Number.isFinite(j.expires_in))
     throw oauthError("access_denied","Invalid Discord token response.");
-  if(!validScope(String(j.scope||"")))throw oauthError("invalid_scope","Discord did not grant required permissions.");
+  if(!validGrantedScope(String(j.scope||"")))throw oauthError("invalid_scope","Discord did not grant identity and server-list permissions.");
   return {access:j.access_token,refresh:j.refresh_token,expires:now()+j.expires_in*1000,scope:j.scope};
 }
 async function discordFetch(token,path){
-  if(!["/users/@me","/users/@me/guilds/"+NARUTO_GUILD_ID+"/member"].includes(path))
+  if(!["/users/@me","/users/@me/guilds","/users/@me/guilds/"+NARUTO_GUILD_ID+"/member"].includes(path))
     throw Error("Unapproved Discord API endpoint");
   const res=await fetch(DISCORD+path,{headers:{
     authorization:"Bearer "+token,accept:"application/json"
@@ -201,12 +212,22 @@ async function verified(env,creds){
   const profile=await discordFetch(creds.access,"/users/@me");
   if(!profile || profile.id!==env.BUSHIN_OWNER_DISCORD_ID)
     throw oauthError("access_denied","This Discord account is not the Bushin owner.",403);
-  const membership=await discordFetch(creds.access,"/users/@me/guilds/"+NARUTO_GUILD_ID+"/member");
-  if(!membership)throw oauthError("access_denied","Discord account is not in Naruto Project RP.",403);
+  const hasMemberScope=String(creds.scope||"").split(/\s+/).includes("guilds.members.read");
+  let membership=null;
+  if(hasMemberScope){
+    membership=await discordFetch(creds.access,"/users/@me/guilds/"+NARUTO_GUILD_ID+"/member");
+    if(!membership)throw oauthError("access_denied","Discord account is not in Naruto Project RP.",403);
+  }else{
+    // When Discord omits guilds.members.read, verify the Naruto RP guild
+    // using the granted guilds scope. Do not invent nickname or role details.
+    const guilds=await discordFetch(creds.access,"/users/@me/guilds");
+    if(!Array.isArray(guilds)||!guilds.some(g=>g?.id===NARUTO_GUILD_ID))
+      throw oauthError("access_denied","Discord account is not in Naruto Project RP.",403);
+  }
   return {id:profile.id,username:String(profile.username||""),
     display_name:String(profile.global_name||profile.username||""),
-    membership:{guild_id:NARUTO_GUILD_ID,member:true,nickname:membership.nick||null,
-      roles_count:Array.isArray(membership.roles)?membership.roles.length:null}};
+    membership:{guild_id:NARUTO_GUILD_ID,member:true,nickname:membership?.nick||null,
+      roles_count:Array.isArray(membership?.roles)?membership.roles.length:null}};
 }
 function cbUri(row,env,code,err){
   const uri=new URL(row.redirect_uri);
@@ -240,7 +261,10 @@ async function discordCallback(req,env){
     return redirect(cbUri(row,env,null,"access_denied"));
   }
 }
-async function saveTokens(env,clientId,scope,userId,creds){
+async function saveTokens(env,clientId,userId,creds){
+  // Store and return actual Discord-granted scopes, not the requested scopes.
+  if(!validGrantedScope(creds.scope))throw oauthError("invalid_scope","Invalid granted OAuth scopes.");
+  const scope=creds.scope;
   const access=rnd(),refresh=rnd(),saved=await seal(creds,env);
   const duration=Math.max(60000,Math.min(25*minute,creds.expires-now()-60000));
   const time=now();
@@ -267,7 +291,7 @@ async function token(req,env){
        !await pkceVerify(p.code_verifier,code.pkce_challenge))
       throw oauthError("invalid_grant","Invalid or already used PKCE authorization code.");
     const credentials=await unseal(code.creds_encrypted,env);
-    return saveTokens(env,p.client_id,code.scope,code.user_id,credentials);
+    return saveTokens(env,p.client_id,code.user_id,credentials);
   }
   if(p.grant_type==="refresh_token"){
     if(typeof p.refresh_token!=="string"||p.refresh_token.length>256)
@@ -281,7 +305,7 @@ async function token(req,env){
       const profile=await verified(env,credentials);
       if(profile.id!==row.user_id)throw oauthError("invalid_grant","Discord identity mismatch.");
     }
-    return saveTokens(env,row.client_id,row.scope,row.user_id,credentials);
+    return saveTokens(env,row.client_id,row.user_id,credentials);
   }
   throw oauthError("unsupported_grant_type","Unsupported OAuth grant");
 }
@@ -291,7 +315,7 @@ async function session(req,env){
   if(!token)return null;
   const record=await q(env,"SELECT * FROM oauth_access WHERE token_hash=? AND expires_at>?",
     await digest(token),now()).first();
-  if(!record||!validScope(record.scope)||record.user_id!==env.BUSHIN_OWNER_DISCORD_ID)return null;
+  if(!record||!validGrantedScope(record.scope)||record.user_id!==env.BUSHIN_OWNER_DISCORD_ID)return null;
   const creds=await unseal(record.creds_encrypted,env);
   if(creds.expires<now()+30000)return null;
   return {record,creds};
