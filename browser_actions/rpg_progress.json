@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "personagem": "Henrique",
+  "servidor": "Naruto Project RP",
+  "vila": "Konoha",
+  "cla": null,
+  "nivel": null,
+  "graduacao": null,
+  "time_confirmado": null,
+  "local_rp_atual": null,
+  "missao_ativa": null,
+  "ryo": null,
+  "treinos_concluidos": [],
+  "missoes_concluidas": [],
+  "objetivos": [
+    {
+      "id": "ficha",
+      "descricao": "Conferir ficha, nível e graduação em canal autorizado",
+      "estado": "pendente"
+    },
+    {
+      "id": "time",
+      "descricao": "Verificar vaga no time de Konoha e pedir confirmação ao jogador",
+      "estado": "pendente"
+    },
+    {
+      "id": "treino",
+      "descricao": "Identificar treino permitido para o nível confirmado",
+      "estado": "pendente"
+    },
+    {
+      "id": "missao",
+      "descricao": "Localizar missão elegível e confirmar regras/recompensas",
+      "estado": "pendente"
+    }
+  ],
+  "observacao": "Apenas vila foi observada no papel do Discord. Campos sem confirmação permanecem null. Este arquivo não comprova progressão no servidor.",
+  "ultima_verificacao": null
+}
