@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {createHash} from "node:crypto";
 import worker,{allowedRedirect,validScope,pkceVerify,classifyDiscordTokenFailure,personalCommandsConsentUrl} from "../src/worker.mjs";
 
 test("Only ChatGPT official callback paths accepted",()=>{
