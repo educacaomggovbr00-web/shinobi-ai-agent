@@ -1,12 +1,11 @@
 {
-  "id": "bushin-v15-work-control-check-39184315765-01",
+  "id": "bushin-v15-open-rp-39184315765-02",
   "session_id": "39184315765",
-  "action": "status",
+  "action": "open_url",
   "ok": true,
   "data": {
-    "online": true,
-    "url": "https://discord.com/login",
+    "url": "https://discord.com/channels/1515877468299595919/1520116350360617154",
     "title": "Discord"
   },
-  "finished_at_utc": "2026-10-19T01:14:42.791214+00:00"
+  "finished_at_utc": "2026-10-19T01:15:19.013199+00:00"
 }
