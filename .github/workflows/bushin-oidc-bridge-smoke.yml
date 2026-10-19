@@ -19,7 +19,7 @@ jobs:
           BUSHIN_BRIDGE: "https://bushin-discord-direct.henrique-silva081106.workers.dev/bridge/runner/register?dry_run=1"
         run: |
           python - <<'PY'
-          import json,os,urllib.parse,urllib.request,urllib.error
+          import json,os,urllib.parse,urllib.request,urllib.error,base64,time
           url=os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
           separator="&" if "?" in url else "?"
           url+=separator+urllib.parse.urlencode({"audience":"bushin-cloudflare-visual-v1"})
@@ -27,6 +27,10 @@ jobs:
           with urllib.request.urlopen(req,timeout=15) as res:
               jwt=json.load(res).get("value")
           assert jwt and len(jwt)>150
+          claims=json.loads(base64.urlsafe_b64decode(jwt.split(".")[1]+"==="))
+          for label in ("iss","aud","sub","repository","ref","workflow_ref","event_name","runner_environment","run_id"):
+              print("OIDC",label,":",claims.get(label))
+          print("OIDC temporal delta:",{k:int(claims.get(k,0))-int(time.time()) for k in ("iat","nbf","exp")})
           req=urllib.request.Request(os.environ["BUSHIN_BRIDGE"],data=b"{}",method="POST",
               headers={"Authorization":"Bearer "+jwt,"Content-Type":"application/json","User-Agent":"Bushin-Github-OIDC-Check"})
           try:
