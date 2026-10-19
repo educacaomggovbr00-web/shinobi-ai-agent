@@ -1,0 +1,29 @@
+name: "🍥 Bushin — Discord OAuth próprio (testes)"
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "services/discord-oauth/**"
+      - ".github/workflows/bushin-discord-oauth-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: "Validar JavaScript do servidor e cliente Discord"
+        run: |
+          node --check services/discord-oauth/src/server.mjs
+          node --check services/discord-oauth/src/discord-api.mjs
+      - name: "Testar OAuth: privacidade, escopos e autorização"
+        run: node --test services/discord-oauth/tests/*.test.mjs
+      - name: "Instalar SDK MCP para verificar dependências"
+        working-directory: services/discord-oauth
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
