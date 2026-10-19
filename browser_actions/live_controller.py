@@ -126,7 +126,7 @@ def validate_command(command, run_id):
                 raise ValueError("Click coordinates must be integers within the browser viewport")
     if action == "press":
         if command.get("key") not in (
-            "Escape", "Tab", "Shift+Tab", "ArrowUp", "ArrowDown",
+            "Escape", "Enter", "Tab", "Shift+Tab", "ArrowUp", "ArrowDown",
             "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"
         ):
             raise ValueError("Only non-submitting navigation keys are permitted")
@@ -424,6 +424,13 @@ async def perform(action, command):
                 return await safe_point_click(page, command["x"], command["y"])
             if action == "press":
                 assert_rp_channel(page.url)
+                if command["key"] == "Enter":
+                    blocked = await page.evaluate("""() => {
+                      const el=document.activeElement;
+                      return !!el?.closest('input,textarea,select,form,[contenteditable="true"],[role="textbox"],button,[role="button"],a,[role="link"]');
+                    }""")
+                    if blocked:
+                        raise ValueError("Enter disabled while focused on a form, chat editor, link, or button")
                 if await page.locator(':focus').count():
                     focused = await page.evaluate("""() => {
                       const el = document.activeElement;
