@@ -63,8 +63,7 @@ function validate(action, args) {
   }
   if (action==="compose_message") {
     c.channel_url=channelUrl(args.channel_url);
-    if(typeof args.text!=="string"||!args.text.trim()||args.text.length>500||/[
-]/.test(args.text)||/@(?:everyone|here)/i.test(args.text))
+    if(typeof args.text!=="string"||!args.text.trim()||args.text.length>500||/[\r\n]/.test(args.text)||/@(?:everyone|here)\b/i.test(args.text))
       throw Error("Mensagem de rascunho inválida.");
     c.text=args.text;
     return c;
