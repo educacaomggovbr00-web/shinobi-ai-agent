@@ -61,7 +61,7 @@ const specs=[
  ["ui_live_panel","Estado do painel visual",[]]
 ];
 const property={
- confirmed:{type:"boolean"},x:{type:"integer",minimum:0,maximum:1364},
+ limit:{type:"integer",minimum:1,maximum:30},confirmed:{type:"boolean"},x:{type:"integer",minimum:0,maximum:1364},
  y:{type:"integer",minimum:0,maximum:767},
  amount:{type:"integer",minimum:1,maximum:8},direction:{type:"string",enum:["up","down"]},
  urls:{type:"array",items:{type:"string"},minItems:1,maxItems:4},
@@ -78,14 +78,16 @@ const readonly=new Set([
  "github_read_repo","bushin_load_state","auth_status","auth_connect","auth_disconnect",
  "permissions_check","audit_log","ui_live_panel"
 ]);
-export const ADVANCED_TOOLS=specs.map(([name,title,keys])=>({
- name:"bushin_"+name,title:"🍥 "+title,
+export const ADVANCED_TOOLS=specs.filter(([name])=> !["browser_status","discord_whoami"].includes(name)).map(([name,title,keys])=>({
+ name:name.startsWith("bushin_")?name:"bushin_"+name,title:"🍥 "+title,
  description:title+". Resultado mostra se há sessão e autorização reais; não confunda ferramenta registrada com acesso ativo.",
  inputSchema:{type:"object",properties:Object.fromEntries([...new Set([...keys,
  ...(["browser_tabs","github_read_repo","files_list"].includes(name)?["path"]:[]),
  ...(["browser_type"].includes(name)?["channel_url"]:[]),
  ...(["browser_tabs"].includes(name)?["tab_index"]:[]),
  ...(["task_start"].includes(name)?["description","steps"]:[]),
+ ...(["task_resume"].includes(name)?["confirmed"]:[]),
+ ...(["discord_read_messages","audit_log"].includes(name)?["limit"]:[]),
  ...(["task_status","task_logs"].includes(name)?[]:[])
  ])].map(k=>[k, property[k]|| (k==="tab_index"?{type:"integer",minimum:0,maximum:20}:k==="steps"?{type:"array",maxItems:12,items:{type:"string",maxLength:120}}:{type:"string",maxLength:1200})])),
  required:keys,additionalProperties:false},
@@ -95,7 +97,7 @@ export const ADVANCED_NAMES=new Set(ADVANCED_TOOLS.map(x=>x.name));
 const blocked=(name,reason)=>({state:"unavailable",tool:name,reason,implemented:false});
 export async function advancedCall(env,name,args={},ctx={}){
  if(!ADVANCED_NAMES.has(name))throw Error("Ferramenta Bushin desconhecida.");
- const simple=name.slice(7);
+ const simple=["bushin_save_state","bushin_load_state"].includes(name)?name:name.slice(7);
  if(simple.startsWith("browser_")||["ui_screenshot_gallery","ui_live_panel","session_reconnect"].includes(simple)){
    if(simple==="browser_start")return repoCall(env,"browser_start",args,ctx);
    if(["browser_upload_file","browser_download_file"].includes(simple))
