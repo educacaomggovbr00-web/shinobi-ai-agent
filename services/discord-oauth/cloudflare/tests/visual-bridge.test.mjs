@@ -48,7 +48,7 @@ const runId="39212345678";
 function jwt(overrides={}){
  const now=Math.floor(Date.now()/1000);
  const payload={iss:"https://token.actions.githubusercontent.com",aud:"bushin-cloudflare-visual-v1",
- repository:"educacaomggovbr00-web/shinobi-ai-agent",ref:"refs/heads/main",
+ repository:"educacaomggovbr00-web/shinobi-ai-agent",repository_id:"1424794298",repository_owner_id:"260082480",ref:"refs/heads/main",
  workflow_ref:"educacaomggovbr00-web/shinobi-ai-agent/.github/workflows/bushin-discord-live.yml@refs/heads/main",
  sub:"repo:educacaomggovbr00-web/shinobi-ai-agent:ref:refs/heads/main",
  event_name:"workflow_dispatch",runner_environment:"github-hosted",
@@ -111,6 +111,9 @@ test("Signed GitHub Actions OIDC safely registers runner, exchanges one private 
   return Response.json({keys:[jwk]});
  };
  assert.equal(await verifyGitHubOidc(jwt({repository:"attacker/other-repo"})),null);
+ assert.equal(await verifyGitHubOidc(jwt({repository_id:"9999999999"})),null);
+ assert.equal(await verifyGitHubOidc(jwt({sub:"repo:other-user/other-repo:ref:refs/heads/main"})),null);
+ assert.equal((await verifyGitHubOidc(jwt({sub:"repo:educacaomggovbr00-web@260082480/shinobi-ai-agent@1424794298:ref:refs/heads/main"}))).runId,runId);
  assert.equal((await verifyGitHubOidc(jwt())).runId,runId);
  const db=new FakeD1(),env={...envBase,DB:db};
  let reg=await visualRunner(new Request(origin+"/bridge/runner/register",{method:"POST",headers:{authorization:"Bearer "+jwt()}}),env);
