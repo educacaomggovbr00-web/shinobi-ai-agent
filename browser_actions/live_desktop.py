@@ -127,12 +127,14 @@ async def start():
         pw = await async_playwright().start()
         chromium_bin = pw.chromium.executable_path
         await pw.stop()
-        processes.append(process(
+        chromium_args = (
             chromium_bin, "--no-sandbox", "--disable-dev-shm-usage",
             "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=9222",
             "--no-first-run", "--disable-default-apps", "--disable-features=MediaRouter",
             "--user-data-dir=" + str(browser_profile), "--window-size=1300,720",
-            LOGIN_URL, env=env))
+            LOGIN_URL)
+        chromium_position = len(processes)
+        processes.append(process(*chromium_args, env=env))
         await asyncio.sleep(4)
         if any(p.poll() is not None for p in processes):
             raise RuntimeError("Um processo do desktop terminou antes de iniciar")
@@ -188,6 +190,8 @@ async def start():
         from live_controller import listen_commands
         controller_task = asyncio.create_task(listen_commands())
         started = time.monotonic()
+        browser_disconnects = 0
+        browser_restarts = 0
         while time.monotonic() - started < MAX_SECONDS:
             await asyncio.sleep(30)
             if controller_task.done():
@@ -196,6 +200,29 @@ async def start():
                 raise RuntimeError("Tunel seguro foi encerrado")
             if any(p.poll() is not None for p in processes[:4]):
                 raise RuntimeError("Desktop ou servidor VNC parou")
+            try:
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection("127.0.0.1", 9222), timeout=4)
+                writer.close()
+                await writer.wait_closed()
+                browser_disconnects = 0
+            except (OSError, asyncio.TimeoutError):
+                browser_disconnects += 1
+                if browser_disconnects >= 2:
+                    if browser_restarts >= 5:
+                        raise RuntimeError("Chromium disconnected too many times")
+                    print("🍥 Bushin: Chromium CDP disconnected; restarting with the same temporary browser profile", flush=True)
+                    old_browser = processes[chromium_position]
+                    if old_browser.poll() is None:
+                        old_browser.terminate()
+                        try:
+                            await asyncio.wait_for(asyncio.to_thread(old_browser.wait), timeout=5)
+                        except asyncio.TimeoutError:
+                            old_browser.kill()
+                    await asyncio.sleep(3)
+                    processes[chromium_position] = process(*chromium_args, env=env)
+                    browser_restarts += 1
+                    browser_disconnects = 0
             minutes = int((time.monotonic() - started) / 60)
             if minutes % 5 == 0:
                 print("🍥 Linux online - %s min decorridos" % minutes, flush=True)
