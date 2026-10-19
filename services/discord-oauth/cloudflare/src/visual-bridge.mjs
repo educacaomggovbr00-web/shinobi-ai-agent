@@ -126,6 +126,8 @@ export async function visualRunner(req,env){
    const jwt=head.startsWith("Bearer ")?head.slice(7):"";
    let validated;try{validated=await verifyGitHubOidc(jwt)}catch{return fail("OIDC verification rejected",403);}
    if(!validated)return fail("Unauthorized runner identity",403);
+   // Verification-only test: no runner secret or database session is created.
+   if(new URL(req.url).searchParams.get("dry_run")==="1")return json({verified:true,run_id:validated.runId});
    // Short-lived and one-use OIDC jti prevents replay of a GH id token.
    const before=await query(env,"SELECT jti_hash FROM bushin_visual_jti WHERE jti_hash=?",await digest(validated.jti)).first();
    if(before)return fail("OIDC replay rejected",409);
