@@ -35,7 +35,7 @@ test("Bridge rejects posting and sensitive interaction before calling GitHub", a
     {action:"send_message",text:"oi"},
     {action:"open_url",url:"https://discord.com/channels/@me"},
     {action:"open_url",url:"https://discord.com/channels/1515877468299595919/123456789012345678?token=1"},
-    {action:"press",key:"Enter"},
+    {action:"press",key:"Control+V"},
     {action:"type_search",text:"ola\nmensagem"},
     {action:"click",x:1365,y:100},
     {action:"rpg_scout",urls:["https://discord.com/channels/999999999999999999/123456789012345678"]}
