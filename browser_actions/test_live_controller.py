@@ -69,5 +69,31 @@ class BushinRemoteTests(unittest.TestCase):
             "scroll"
         )
 
+    def test_capture_gallery_authorized_channels_only(self):
+        first = "https://discord.com/channels/1515877468299595919/1520116350360617154"
+        second = "https://discord.com/channels/1515877468299595919/1544461080624111716"
+        third = "https://discord.com/channels/1515877468299595919/1520114256740352061"
+        command = {"id": "gallery1", "session_id": RUN,
+                   "action": "capture_gallery", "urls": [first, second, third]}
+        self.assertEqual(validate_command(command, RUN), "capture_gallery")
+        forbidden = [
+            [], [first], [first]*2, [first]*5,
+            "not-an-array", [first, "https://discord.com/channels/@me/1000000000000000000"],
+            [first, "https://discord.com/channels/9999999999999999999/1520114256740352061"],
+            [first, "https://discord.com/login"],
+            [first, "https://discord.com/channels/1515877468299595919/invalid"],
+            [first, "https://discord.com/channels/1515877468299595919/1544461080624111716?token=x"],
+        ]
+        for urls in forbidden:
+            with self.subTest(urls=urls), self.assertRaises(ValueError):
+                validate_command({**command, "urls": urls}, RUN)
+
+    def test_capture_gallery_session_binding(self):
+        first = "https://discord.com/channels/1515877468299595919/1520116350360617154"
+        second = "https://discord.com/channels/1515877468299595919/1544461080624111716"
+        with self.assertRaises(ValueError):
+            validate_command({"id":"gallery2", "session_id":"other-run",
+                              "action":"capture_gallery", "urls":[first,second]}, RUN)
+
 if __name__ == "__main__":
     unittest.main()
