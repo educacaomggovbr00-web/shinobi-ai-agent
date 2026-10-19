@@ -23,7 +23,7 @@ test("Real MCP server boots, declares native visual tools and challenges OAuth",
  const dir=fileURLToPath(new URL("../",import.meta.url));
  const p=await port();
  const server=spawn(process.execPath,["src/server.mjs"],{
-   cwd:dir,env:{...process.env,PORT:String(p),PUBLIC_BASE_URL:"https://bushin.example",BUSHIN_OWNER_DISCORD_ID:"123456789012345678"},
+   cwd:dir,env:{...process.env,PORT:String(p),PUBLIC_BASE_URL:"https://bushin.example",BUSHIN_OWNER_DISCORD_ID:"123456789012345678",DISCORD_CLIENT_SECRET:"fake-secret-used-only-in-github-tests"},
    stdio:["ignore","pipe","pipe"]
  });
  let stderr="";
@@ -36,6 +36,27 @@ test("Real MCP server boots, declares native visual tools and challenges OAuth",
    assert.equal(health.login_required,true);
    const meta=await (await fetch("http://127.0.0.1:"+p+"/.well-known/oauth-protected-resource")).json();
    assert.equal(meta.resource,"https://bushin.example/mcp");
+   assert.deepEqual(meta.authorization_servers,["https://bushin.example"]);
+   const as=await (await fetch("http://127.0.0.1:"+p+"/.well-known/oauth-authorization-server")).json();
+   assert.deepEqual(as.code_challenge_methods_supported,["S256"]);
+   assert.ok(as.registration_endpoint.endsWith("/oauth/register"));
+   const badRegistration=await fetch("http://127.0.0.1:"+p+"/oauth/register",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({redirect_uris:["https://evil.example/token"]})
+   });
+   assert.equal(badRegistration.status,400);
+   const dcr=await fetch("http://127.0.0.1:"+p+"/oauth/register",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({redirect_uris:["https://chatgpt.com/connector_platform_oauth_redirect"],
+         token_endpoint_auth_method:"none"})
+   });
+   assert.equal(dcr.status,201);
+   assert.ok((await dcr.json()).client_id);
+   const challenge=await fetch("http://127.0.0.1:"+p+"/oauth/token",{
+      method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({grant_type:"invalid",client_id:"fake",resource:"https://bushin.example/mcp"})
+   });
+   assert.ok(challenge.status>=400);
    const req=async(method,params,id)=>fetch("http://127.0.0.1:"+p+"/mcp",{
      method:"POST",
      headers:{"content-type":"application/json","accept":"application/json, text/event-stream"},
