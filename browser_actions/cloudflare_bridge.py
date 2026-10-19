@@ -65,10 +65,18 @@ def register_runner():
     return secret
 
 
-async def run_bridge():
+async def run_bridge(takeover_url=None):
     if not re.fullmatch(r"[0-9]{8,20}", RUN_ID):
         raise RuntimeError("Missing GITHUB_RUN_ID")
     runner_token = await asyncio.to_thread(register_runner)
+    if isinstance(takeover_url, str) and takeover_url.startswith("https://"):
+        try:
+            # The signed runner sends its private one-use visual login link to
+            # the Worker's AES-GCM encrypted D1 storage. Never print it here.
+            await asyncio.to_thread(send, "/bridge/runner/takeover?run_id=" + RUN_ID,
+                                    "POST", {"url": takeover_url}, runner_token)
+        except Exception as error:
+            print("🍥 Mobile takeover link could not be registered:", type(error).__name__, flush=True)
     print("🍥 Bushin visual bridge: verified by GitHub OIDC, ready for mobile commands", flush=True)
     from live_controller import validate_command, perform
     pending_failures = 0
