@@ -229,7 +229,9 @@ async def start():
         gateway.app["public_origin"]["url"] = base_url.rstrip("/")
         # Public hostname only: never publish the private /connect key.
         Path("/tmp/bushin-public-origin").write_text(base_url.rstrip("/") + "/vnc.html?autoconnect=1&resize=scale", encoding="utf-8")
-        user_url = base_url.rstrip("/") + "/connect?key=" + quote(secret)
+        gateway_origin = "https://bushin-work-gateway.henrique-silva081106.workers.dev"
+        user_url = (gateway_origin + "/connect?host=" + quote(urlsplit(base_url).hostname, safe="")
+                    + "&key=" + quote(secret))
         summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
         summary = (
             "## 🍥 Bushin Discord — desktop AO VIVO\n\n"
