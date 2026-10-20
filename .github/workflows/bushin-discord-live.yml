@@ -40,6 +40,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Runner Linux efemero: fontes Microsoft podem responder 403 e impedir apt.
+          # Desativar somente fontes Microsoft, sem tocar em credenciais ou repo.
+          while IFS= read -r -d '' source_file; do
+            if sudo grep -q 'packages.microsoft.com' "$source_file"; then
+              echo "Desativando fonte apt indisponivel: $(basename "$source_file")"
+              sudo mv "$source_file" "$source_file.bushin-disabled"
+            fi
+          done < <(find /etc/apt/sources.list.d -maxdepth 1 -type f \( -name '*.list' -o -name '*.sources' \) -print0)
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             --no-install-recommends xvfb x11vnc openbox novnc websockify
@@ -67,6 +75,15 @@ jobs:
             --output "$RUNNER_TEMP/cloudflared"
           chmod 700 "$RUNNER_TEMP/cloudflared"
           "$RUNNER_TEMP/cloudflared" --version
+
+      - name: "🍥 Login humano → continuar automaticamente no mesmo workflow"
+        shell: bash
+        run: |
+          echo "## 🍥 Faça login no Discord e o Bushin continua" >> "$GITHUB_STEP_SUMMARY"
+          echo "Abra os **logs do último passo** para obter o link temporário privado." >> "$GITHUB_STEP_SUMMARY"
+          echo "O Bushin aguarda até 15 minutos para você entrar no Discord pela janela do navegador." >> "$GITHUB_STEP_SUMMARY"
+          echo "Após o login, o receptor de comandos da MESMA execução inicia automaticamente." >> "$GITHUB_STEP_SUMMARY"
+          echo "Não cole senhas, códigos ou tokens nos logs ou no ChatGPT." >> "$GITHUB_STEP_SUMMARY"
 
       - name: "🍥 Linux AO VIVO — abrir link nos logs ou resumo"
         env:
