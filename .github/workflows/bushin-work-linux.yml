@@ -1,0 +1,66 @@
+name: "🍥 Bushin — Abrir Linux no Work"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bushin-work-linux-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux:
+    name: "Linux no navegador — link no resumo"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: "Baixar Bushin"
+        uses: actions/checkout@v4
+
+      - name: "Preparar Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Instalar desktop e navegador"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile browser_actions/live_desktop.py browser_actions/live_controller.py
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb x11vnc openbox novnc websockify
+          python -m pip install 'aiohttp==3.11.18' 'playwright==1.56.0'
+          python -m playwright install chromium --with-deps
+          npm install --prefix browser_actions --no-save --no-package-lock --ignore-scripts --no-audit --no-fund '@actions/artifact@2.3.2'
+
+      - name: "Preparar acesso HTTPS"
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 --output "$RUNNER_TEMP/cloudflared"
+          chmod 700 "$RUNNER_TEMP/cloudflared"
+          "$RUNNER_TEMP/cloudflared" --version
+
+      - name: "Publicar instrucoes no resumo"
+        shell: bash
+        run: |
+          {
+            echo '## 🍥 Bushin — Linux para abrir no ChatGPT Work'
+            echo ''
+            echo 'Aguarde a etapa **Linux ativo** iniciar. Ela colocará neste resumo o **link HTTPS privado** do desktop.'
+            echo ''
+            echo 'O endereço do túnel é acessível na internet; a área de trabalho exige uma chave temporária.'
+            echo 'Abra o link no Work somente enquanto este job estiver em execução.'
+            echo 'Não compartilhe o link privado e não copie sua chave em mensagens.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "Linux ativo — link privado no resumo da execução"
+        env:
+          CLOUDFLARED_BIN: ${{ runner.temp }}/cloudflared
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -u browser_actions/live_desktop.py
