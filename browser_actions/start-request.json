@@ -1,7 +1,9 @@
 {
   "requested": true,
-  "request_id": "bushin-visual-oidc-20261019-001",
-  "purpose": "Teste solicitado de controle visual do Bushin no Android via Cloudflare",
-  "safe_login": "Login somente pela sessão HTTPS privada do GitHub Actions",
-  "no_auto_discord_message": true
+  "request_id": "bushin-manual-login-resume-20261019-001",
+  "purpose": "Abrir o Discord no Chromium remoto; aguardar o proprietario fazer login e retomar o receptor de comandos na mesma execucao",
+  "login_checkpoint": "15 minutos; acesso pelo link privado nos logs do GitHub Actions",
+  "continue_after_login": true,
+  "no_auto_discord_message": true,
+  "credentials": "never in GitHub, ChatGPT or artifacts"
 }
