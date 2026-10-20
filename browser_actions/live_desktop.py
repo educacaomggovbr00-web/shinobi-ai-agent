@@ -17,7 +17,7 @@ DISPLAY = ":99"
 PORT = 8787
 BACKEND = "http://127.0.0.1:6081"
 VNC_DIR = "/usr/share/novnc"
-LOGIN_URL = "https://discord.com/login?redirect_to=%2Fstore"
+LOGIN_URL = "https://discord.com/login?redirect_to=%2Fchannels%2F%40me"
 MAX_SECONDS = 345 * 60
 
 LOGIN_HTML = """<!doctype html>
@@ -158,6 +158,47 @@ def process(*args, env=None):
         list(args), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True)
 
+def is_discord_logged_in_view(url):
+    """Only a Discord channel route indicates interactive login completed.
+
+    Never inspect, store or transmit user credentials, tokens or cookies.
+    """
+    parsed = urlsplit(url)
+    return (parsed.scheme == "https"
+            and parsed.hostname in ("discord.com", "www.discord.com")
+            and (parsed.path == "/channels/@me"
+                 or (parsed.path.startswith("/channels/") and parsed.path != "/channels/")))
+
+
+async def await_manual_discord_login(timeout_seconds=900):
+    """Keep the same browser alive while the owner logs in through noVNC.
+
+    Starting the GitHub command receiver only after this checkpoint prevents
+    automation from accessing the login form or running before authorization.
+    """
+    from playwright.async_api import async_playwright
+    print("🍥 CHECKPOINT: aguardando login manual no Discord (ate 15 minutos).", flush=True)
+    print("Abra o link privado nos logs; preencha senha e 2FA SOMENTE no Discord.", flush=True)
+    deadline = time.monotonic() + timeout_seconds
+    async with async_playwright() as pw:
+        browser = await pw.chromium.connect_over_cdp("http://127.0.0.1:9222", timeout=15000)
+        try:
+            while time.monotonic() < deadline:
+                for context in browser.contexts:
+                    for page in context.pages:
+                        if is_discord_logged_in_view(page.url):
+                            try:
+                                if await page.locator('input[type="password"]').count() == 0:
+                                    print("🍥 LOGIN CONCLUÍDO: o mesmo workflow retomará os comandos Bushin.", flush=True)
+                                    return True
+                            except Exception:
+                                continue
+                await asyncio.sleep(3)
+        finally:
+            await browser.close()
+    return False
+
+
 async def start():
     secret = secrets.token_urlsafe(40)
     # Do not pass GitHub API credentials to any browser/desktop subprocess.
@@ -249,6 +290,12 @@ async def start():
         print("========================================================", flush=True)
         print("NAO compartilhe este link. Ele controla a tela do Linux com acesso ao Discord.", flush=True)
         print("O desktop nao sera salvo nem tera suas senhas enviadas ao repositorio.", flush=True)
+
+        # The user completes Discord login in the interactive Chromium window.
+        # Only after the browser reaches an authenticated Discord channel
+        # does this SAME workflow start processing its command queue.
+        if not await await_manual_discord_login():
+            raise RuntimeError("Login nao concluido no prazo de 15 minutos; reinicie o workflow para tentar novamente")
 
         # Authenticated GitHub command queue, independent from private VNC link.
         from live_controller import listen_commands
